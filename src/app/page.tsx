@@ -34,7 +34,7 @@ export default function LandingPage() {
           Help your child achieve a Distinction in PLE
         </h1>
         <p style={{ fontSize: 16, opacity: 0.85, lineHeight: 1.7, maxWidth: 400, margin: '0 auto 32px' }}>
-          Uganda&apos;s first AI-powered P7 tutor. Personalised practice in Maths, English and Science — with an AI tutor available any time of day.
+          Uganda&apos;s first AI-powered P7 tutor with adaptive learning. Personalised practice in Maths, English and Science — identifying your child&apos;s weak areas and focusing on them until mastered.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/login" style={{
@@ -77,7 +77,7 @@ export default function LandingPage() {
           P7 is the most important exam of a child&apos;s primary education
         </h2>
         <p style={{ fontSize: 15, color: '#5F5E5A', lineHeight: 1.8, marginBottom: 20 }}>
-          The Primary Leaving Examination determines which secondary school your child attends. Yet most P7 students lack access to personalised academic support — private tutors are expensive, class sizes are large, and revision materials are generic.
+          The Primary Leaving Examination determines which secondary school your child attends. Yet most P7 students lack access to personalised academic support — class sizes are large, teacher time is limited, and revision materials are generic rather than tailored to each child's specific gaps.
         </p>
         <p style={{ fontSize: 15, color: '#5F5E5A', lineHeight: 1.8 }}>
           Distinction PLE Tutor changes that. For less than the cost of one private tuition session, your child gets a dedicated AI tutor available every day — adapting to their specific weaknesses and building their confidence question by question.
