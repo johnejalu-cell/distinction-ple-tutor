@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -46,6 +46,12 @@ function SessionContent() {
   const [tutorLoading, setTutorLoading] = useState(false)
   const [tutorError, setTutorError] = useState('')
 
+  // Image upload state
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [uploadedImageType, setUploadedImageType] = useState<string>('image/jpeg')
+  const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const subjectCode = searchParams.get('subject') || 'mathematics'
@@ -68,7 +74,6 @@ function SessionContent() {
     if (!subject) { router.push('/dashboard'); return }
     setSubjectName(subject.name)
 
-    // Get all subtopics for this subject
     const { data: subtopics } = await supabase
       .from('subtopics')
       .select('id, topics!inner(subject_id)')
@@ -78,24 +83,21 @@ function SessionContent() {
     const allSubtopicIds = subtopics.map(s => s.id)
 
     // ── ADAPTIVE SELECTION ──────────────────────────────────────
-    // Get student's weak subtopics for this subject
     const { data: weakProgress } = await supabase
       .from('student_progress')
       .select('subtopic_id, mastery_pct')
       .eq('student_id', sid)
       .in('subtopic_id', allSubtopicIds)
-      .lt('mastery_pct', 65)           // below 65% = weak
+      .lt('mastery_pct', 65)
       .order('mastery_pct', { ascending: true })
       .limit(5)
 
     let selectedQuestions: Question[] = []
 
     if (weakProgress && weakProgress.length > 0) {
-      // Student has weak areas — use 3:1:1 balanced mix
       setIsAdaptive(true)
       const weakIds = weakProgress.map((w: WeakSubtopic) => w.subtopic_id)
 
-      // Get medium subtopics (practiced before, mastery 65-85%)
       const { data: mediumProgress } = await supabase
         .from('student_progress')
         .select('subtopic_id, mastery_pct')
@@ -107,78 +109,51 @@ function SessionContent() {
         .limit(3)
 
       const mediumIds = (mediumProgress || []).map((m: WeakSubtopic) => m.subtopic_id)
-
-      // Strong/untested = everything else
       const knownIds = [...weakIds, ...mediumIds]
       const strongIds = allSubtopicIds.filter(id => !knownIds.includes(id))
 
-      // Fetch questions from all three groups in parallel
       const [weakRes, mediumRes, strongRes] = await Promise.all([
         supabase.from('questions')
           .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-          .in('subtopic_id', weakIds)
-          .eq('is_active', true)
-          .limit(10),
-
+          .in('subtopic_id', weakIds).eq('is_active', true).limit(10),
         mediumIds.length > 0
           ? supabase.from('questions')
               .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-              .in('subtopic_id', mediumIds)
-              .eq('is_active', true)
-              .limit(6)
+              .in('subtopic_id', mediumIds).eq('is_active', true).limit(6)
           : Promise.resolve({ data: [] }),
-
         strongIds.length > 0
           ? supabase.from('questions')
               .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-              .in('subtopic_id', strongIds)
-              .eq('is_active', true)
-              .limit(6)
+              .in('subtopic_id', strongIds).eq('is_active', true).limit(6)
           : Promise.resolve({ data: [] }),
       ])
 
-      // 3 weak + 1 medium + 1 strong/untested
       const weakQs   = (weakRes.data   || []).sort(() => Math.random() - 0.5).slice(0, 3)
       const mediumQs = (mediumRes.data || []).sort(() => Math.random() - 0.5).slice(0, 1)
       const strongQs = (strongRes.data || []).sort(() => Math.random() - 0.5).slice(0, 1)
-
       const combined = [...weakQs, ...mediumQs, ...strongQs]
-
       if (combined.length >= 3) {
-        // Shuffle final mix so weak questions don't cluster at the start
         selectedQuestions = combined.sort(() => Math.random() - 0.5)
       }
     }
 
-    // Fallback: random selection (new student or no weak areas)
     if (selectedQuestions.length < 3) {
       setIsAdaptive(false)
       const { data: allQs } = await supabase
         .from('questions')
         .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-        .in('subtopic_id', allSubtopicIds)
-        .eq('is_active', true)
-        .limit(20)
-
+        .in('subtopic_id', allSubtopicIds).eq('is_active', true).limit(20)
       if (!allQs?.length) { router.push('/dashboard'); return }
       selectedQuestions = allQs.sort(() => Math.random() - 0.5).slice(0, 5)
     }
 
-    // Ensure exactly 5 questions
     selectedQuestions = selectedQuestions.slice(0, 5)
     setQuestions(selectedQuestions)
 
-    // Create session
     const { data: session } = await supabase
       .from('sessions')
-      .insert({
-        student_id: sid,
-        session_type: 'topic_practice',
-        subject_id: subject.id,
-        total_questions: selectedQuestions.length,
-      })
-      .select('id')
-      .single()
+      .insert({ student_id: sid, session_type: 'topic_practice', subject_id: subject.id, total_questions: selectedQuestions.length })
+      .select('id').single()
 
     if (session) setSessionId(session.id)
     setLoading(false)
@@ -187,23 +162,14 @@ function SessionContent() {
   async function submitAnswer() {
     if (!selected || answered) return
     setAnswered(true)
-
     const q = questions[current]
     const isCorrect = selected === q.correct_answer
-    if (isCorrect) {
-      setCorrect(c => c + 1)
-      setPoints(p => p + 20)
-    }
-
+    if (isCorrect) { setCorrect(c => c + 1); setPoints(p => p + 20) }
     if (sessionId && studentId) {
       await supabase.from('session_responses').insert({
-        session_id: sessionId,
-        student_id: studentId,
-        question_id: q.id,
-        student_answer: selected,
-        is_correct: isCorrect,
-        hint_level_used: hintLevel,
-        scaffold_opened: q.scaffold !== null,
+        session_id: sessionId, student_id: studentId, question_id: q.id,
+        student_answer: selected, is_correct: isCorrect,
+        hint_level_used: hintLevel, scaffold_opened: q.scaffold !== null,
         question_order: current + 1,
       })
     }
@@ -213,7 +179,6 @@ function SessionContent() {
     if (current + 1 >= questions.length) {
       const lastCorrect = selected === questions[current].correct_answer
       const finalCorrect = correct + (lastCorrect ? 1 : 0)
-
       if (sessionId) {
         await supabase.from('sessions').update({
           ended_at: new Date().toISOString(),
@@ -223,7 +188,6 @@ function SessionContent() {
           hints_used: hintLevel,
         }).eq('id', sessionId)
       }
-
       if (studentId) {
         const today = new Date().toISOString().split('T')[0]
         const { data: s } = await supabase.from('students')
@@ -235,8 +199,7 @@ function SessionContent() {
           const yStr = yesterday.toISOString().split('T')[0]
           const newStreak = s.last_active_date === yStr
             ? s.current_streak_days + 1
-            : s.last_active_date === today
-            ? s.current_streak_days : 1
+            : s.last_active_date === today ? s.current_streak_days : 1
           await supabase.from('students').update({
             total_points: s.total_points + points + (lastCorrect ? 20 : 0),
             current_streak_days: newStreak,
@@ -244,11 +207,9 @@ function SessionContent() {
           }).eq('id', studentId)
         }
       }
-
       setDone(true)
       return
     }
-
     setCurrent(c => c + 1)
     setSelected(null)
     setAnswered(false)
@@ -258,6 +219,37 @@ function SessionContent() {
     setTutorResponse('')
     setTutorQuestion('')
     setTutorError('')
+    clearImage()
+  }
+
+  // ── IMAGE HANDLING ──────────────────────────────────────────
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Limit file size to 4MB
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Image is too large. Please use an image under 4MB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const result = event.target?.result as string
+      // result is "data:image/jpeg;base64,/9j/4AAQ..."
+      const base64 = result.split(',')[1]
+      setUploadedImage(base64)
+      setUploadedImageType(file.type || 'image/jpeg')
+      setUploadedImagePreview(result) // full data URL for preview
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function clearImage() {
+    setUploadedImage(null)
+    setUploadedImagePreview(null)
+    setUploadedImageType('image/jpeg')
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function askTutor() {
@@ -276,6 +268,8 @@ function SessionContent() {
           studentQuestion: tutorQuestion,
           subject: subjectName,
           difficulty: q.difficulty,
+          imageBase64: uploadedImage || undefined,
+          imageType: uploadedImageType,
         }),
       })
       const data = await res.json()
@@ -299,8 +293,7 @@ function SessionContent() {
 
   if (done) {
     const total = questions.length
-    const finalCorrect = correct
-    const pct = Math.round((finalCorrect / total) * 100)
+    const pct = Math.round((correct / total) * 100)
     const medal = pct >= 80 ? '🏆' : pct >= 60 ? '🥈' : '🥉'
     const title = pct >= 80 ? 'Excellent work!' : pct >= 60 ? 'Good effort!' : 'Keep practising!'
     const grade = pct >= 91 ? 'D1' : pct >= 81 ? 'D2' : pct >= 71 ? 'D3' : pct >= 61 ? 'D4' : pct >= 51 ? 'D5' : 'D6'
@@ -312,24 +305,19 @@ function SessionContent() {
         <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 24 }}>
           {pct >= 80 ? 'Distinction-level performance!' : 'You\'re improving every day.'}
         </div>
-
         {isAdaptive && (
           <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: 12, padding: 12, width: '100%', marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>
-              🎯 Adaptive session — focused on your weak areas
-            </div>
+            <div style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>🎯 Adaptive session — focused on your weak areas</div>
           </div>
         )}
-
         <div style={{ background: '#EEEDFE', borderRadius: 12, padding: 20, width: '100%', marginBottom: 18 }}>
           <div style={{ fontSize: 52, fontWeight: 500, color: '#3C3489' }}>{pct}%</div>
           <div style={{ fontSize: 12, color: '#888780', marginTop: 4 }}>Session score · Projected {grade}</div>
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, width: '100%', marginBottom: 24 }}>
           {[
-            { label: 'Correct', value: finalCorrect, color: '#1D9E75' },
-            { label: 'Wrong', value: total - finalCorrect, color: '#A32D2D' },
+            { label: 'Correct', value: correct, color: '#1D9E75' },
+            { label: 'Wrong', value: total - correct, color: '#A32D2D' },
             { label: 'Points', value: `+${points}`, color: '#BA7517' },
           ].map(s => (
             <div key={s.label} style={{ background: '#F1EFE8', borderRadius: 8, padding: 12 }}>
@@ -338,13 +326,7 @@ function SessionContent() {
             </div>
           ))}
         </div>
-
-        <button className="btn-primary" onClick={() => {
-          setCurrent(0); setSelected(null); setAnswered(false)
-          setCorrect(0); setPoints(0); setDone(false)
-          setShowTutor(false); setTutorResponse('')
-          init()
-        }}>
+        <button className="btn-primary" onClick={() => { setCurrent(0); setSelected(null); setAnswered(false); setCorrect(0); setPoints(0); setDone(false); setShowTutor(false); setTutorResponse(''); init() }}>
           Try again
         </button>
         <button className="btn-secondary" style={{ marginTop: 10 }} onClick={() => router.push('/dashboard')}>
@@ -375,10 +357,7 @@ function SessionContent() {
         {/* Progress dots */}
         <div style={{ display: 'flex', gap: 5, marginBottom: 18 }}>
           {questions.map((_, i) => (
-            <div key={i} style={{
-              flex: 1, height: 5, borderRadius: 3,
-              background: i < current ? '#1D9E75' : i === current ? '#534AB7' : '#F1EFE8',
-            }} />
+            <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < current ? '#1D9E75' : i === current ? '#534AB7' : '#F1EFE8' }} />
           ))}
         </div>
 
@@ -391,8 +370,8 @@ function SessionContent() {
 
         {/* Subject tag */}
         <div style={{
-          fontSize: 11, fontWeight: 500, padding: '4px 10px',
-          borderRadius: 20, display: 'inline-block', marginBottom: 8,
+          fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20,
+          display: 'inline-block', marginBottom: 8,
           background: subjectCode === 'mathematics' ? '#FAEEDA' : subjectCode === 'english' ? '#E1F5EE' : '#EEEDFE',
           color: subjectCode === 'mathematics' ? '#854F0B' : subjectCode === 'english' ? '#0F6E56' : '#3C3489',
         }}>
@@ -438,9 +417,7 @@ function SessionContent() {
             if (answered) {
               if (opt.id === q.correct_answer) cls += ' correct'
               else if (opt.id === selected) cls += ' wrong'
-            } else if (opt.id === selected) {
-              cls += ' selected'
-            }
+            } else if (opt.id === selected) cls += ' selected'
             return (
               <button key={opt.id} className={cls} onClick={() => !answered && setSelected(opt.id)} disabled={answered}>
                 {String.fromCharCode(65 + q.options.indexOf(opt))}. {opt.text}
@@ -474,17 +451,18 @@ function SessionContent() {
           </div>
         )}
 
-        {/* AI Tutor panel */}
+        {/* ── AI TUTOR PANEL ── */}
         {showTutor && (
           <div style={{ background: '#EEEDFE', border: '0.5px solid rgba(83,74,183,0.25)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#534AB7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#3C3489' }}>AI Tutor</div>
-                <div style={{ fontSize: 11, color: '#888780' }}>Ask me anything about this question</div>
+                <div style={{ fontSize: 11, color: '#888780' }}>Ask me anything — or upload your working</div>
               </div>
             </div>
 
+            {/* Quick suggestions */}
             {!tutorResponse && !tutorLoading && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
                 {[
@@ -506,23 +484,89 @@ function SessionContent() {
               </div>
             )}
 
-            <textarea value={tutorQuestion} onChange={e => setTutorQuestion(e.target.value)}
+            {/* Text input */}
+            <textarea
+              value={tutorQuestion}
+              onChange={e => setTutorQuestion(e.target.value)}
               placeholder="Or type your own question here..."
               rows={2}
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid rgba(83,74,183,0.3)', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', resize: 'none', outline: 'none', background: '#fff', color: '#1a1a2e', marginBottom: 10 }}
             />
 
-            <button onClick={askTutor} disabled={tutorLoading || !tutorQuestion.trim()}
-              style={{ background: tutorLoading || !tutorQuestion.trim() ? '#9b93d4' : '#534AB7', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 14, fontWeight: 500, cursor: tutorLoading || !tutorQuestion.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', width: '100%', marginBottom: 10 }}>
-              {tutorLoading ? '🤔 Thinking...' : '✨ Ask the Tutor'}
+            {/* Image upload section */}
+            <div style={{ marginBottom: 10 }}>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleImageSelect}
+                style={{ display: 'none' }}
+              />
+
+              {!uploadedImagePreview ? (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: '100%', padding: '10px', border: '1.5px dashed rgba(83,74,183,0.4)',
+                    borderRadius: 10, background: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                    fontSize: 13, color: '#534AB7', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>📷</span>
+                  Upload your working or a diagram (optional)
+                </button>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <img
+                    src={uploadedImagePreview}
+                    alt="Your uploaded working"
+                    style={{ width: '100%', borderRadius: 10, maxHeight: 200, objectFit: 'cover', border: '1.5px solid rgba(83,74,183,0.3)' }}
+                  />
+                  <button
+                    onClick={clearImage}
+                    style={{
+                      position: 'absolute', top: 8, right: 8,
+                      background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
+                      borderRadius: '50%', width: 28, height: 28, cursor: 'pointer',
+                      fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    ✕
+                  </button>
+                  <div style={{ fontSize: 11, color: '#534AB7', marginTop: 6, textAlign: 'center' }}>
+                    ✅ Image ready — the tutor will analyse your working
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Ask button */}
+            <button
+              onClick={askTutor}
+              disabled={tutorLoading || !tutorQuestion.trim()}
+              style={{
+                background: tutorLoading || !tutorQuestion.trim() ? '#9b93d4' : '#534AB7',
+                color: '#fff', border: 'none', borderRadius: 10,
+                padding: '10px 16px', fontSize: 14, fontWeight: 500,
+                cursor: tutorLoading || !tutorQuestion.trim() ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', width: '100%', marginBottom: 10,
+              }}
+            >
+              {tutorLoading ? '🤔 Thinking...' : uploadedImage ? '✨ Ask Tutor (with image)' : '✨ Ask the Tutor'}
             </button>
 
+            {/* Tutor response */}
             {tutorResponse && (
               <div style={{ background: '#fff', borderRadius: 10, padding: 14, border: '0.5px solid rgba(83,74,183,0.2)' }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#534AB7', marginBottom: 8 }}>🤖 Tutor says:</div>
                 <div style={{ fontSize: 14, lineHeight: 1.7, color: '#1a1a2e', whiteSpace: 'pre-wrap' }}>{tutorResponse}</div>
-                <button onClick={() => { setTutorResponse(''); setTutorQuestion('') }}
-                  style={{ marginTop: 10, fontSize: 12, color: '#888780', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
+                <button
+                  onClick={() => { setTutorResponse(''); setTutorQuestion(''); clearImage() }}
+                  style={{ marginTop: 10, fontSize: 12, color: '#888780', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+                >
                   Ask another question
                 </button>
               </div>
@@ -548,9 +592,11 @@ function SessionContent() {
                   💡 Hint
                 </button>
               )}
-              <button className="btn-secondary"
+              <button
+                className="btn-secondary"
                 style={{ flex: 1, borderColor: showTutor ? '#534AB7' : undefined, color: showTutor ? '#534AB7' : undefined }}
-                onClick={() => setShowTutor(t => !t)}>
+                onClick={() => setShowTutor(t => !t)}
+              >
                 🤖 Ask Tutor
               </button>
             </div>
