@@ -23,6 +23,33 @@ interface WeakSubtopic {
   mastery_pct: number
 }
 
+// Compress image to JPEG at reduced quality and size
+async function compressImage(file: File, maxWidth = 800, quality = 0.6): Promise<{ base64: string; type: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      let { width, height } = img
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width)
+        width = maxWidth
+      }
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas not supported')); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      const base64 = dataUrl.split(',')[1]
+      resolve({ base64, type: 'image/jpeg' })
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 function SessionContent() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [current, setCurrent] = useState(0)
@@ -50,6 +77,8 @@ function SessionContent() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [uploadedImageType, setUploadedImageType] = useState<string>('image/jpeg')
   const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null)
+  const [imageProcessing, setImageProcessing] = useState(false)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const router = useRouter()
@@ -223,32 +252,30 @@ function SessionContent() {
   }
 
   // ── IMAGE HANDLING ──────────────────────────────────────────
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
-    // Limit file size to 4MB
-    if (file.size > 4 * 1024 * 1024) {
-      alert('Image is too large. Please use an image under 4MB.')
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const result = event.target?.result as string
-      // result is "data:image/jpeg;base64,/9j/4AAQ..."
-      const base64 = result.split(',')[1]
+    setImageProcessing(true)
+    try {
+      const { base64, type } = await compressImage(file, 800, 0.6)
       setUploadedImage(base64)
-      setUploadedImageType(file.type || 'image/jpeg')
-      setUploadedImagePreview(result) // full data URL for preview
+      setUploadedImageType(type)
+      setUploadedImagePreview(`data:${type};base64,${base64}`)
+    } catch {
+      alert('Could not process image. Please try a different photo.')
+    } finally {
+      setImageProcessing(false)
+      // Reset input so same file can be re-selected
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   function clearImage() {
     setUploadedImage(null)
     setUploadedImagePreview(null)
     setUploadedImageType('image/jpeg')
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -276,7 +303,7 @@ function SessionContent() {
       if (data.error) setTutorError(data.error)
       else setTutorResponse(data.explanation)
     } catch {
-      setTutorError('Could not reach the tutor. Please check your connection.')
+      setTutorError('Could not reach the tutor. Please check your connection and try again.')
     } finally {
       setTutorLoading(false)
     }
@@ -468,7 +495,7 @@ function SessionContent() {
                 {[
                   'Can you explain this question to me?',
                   'How do I solve this step by step?',
-                  'What does this question mean?',
+                  'Please check my working in the image',
                 ].map(suggestion => (
                   <button key={suggestion} onClick={() => setTutorQuestion(suggestion)}
                     style={{
@@ -488,65 +515,81 @@ function SessionContent() {
             <textarea
               value={tutorQuestion}
               onChange={e => setTutorQuestion(e.target.value)}
-              placeholder="Or type your own question here..."
+              placeholder="Type your question here..."
               rows={2}
               style={{ width: '100%', padding: '10px 12px', border: '1.5px solid rgba(83,74,183,0.3)', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', resize: 'none', outline: 'none', background: '#fff', color: '#1a1a2e', marginBottom: 10 }}
             />
 
-            {/* Image upload section */}
-            <div style={{ marginBottom: 10 }}>
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageSelect}
-                style={{ display: 'none' }}
-              />
+            {/* Image upload buttons */}
+            {/* Hidden inputs */}
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} style={{ display: 'none' }} />
+            <input ref={fileInputRef}   type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
 
-              {!uploadedImagePreview ? (
+            {!uploadedImagePreview ? (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={imageProcessing}
                   style={{
-                    width: '100%', padding: '10px', border: '1.5px dashed rgba(83,74,183,0.4)',
-                    borderRadius: 10, background: 'rgba(255,255,255,0.7)', cursor: 'pointer',
-                    fontSize: 13, color: '#534AB7', fontFamily: 'inherit',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    flex: 1, padding: '10px 8px',
+                    border: '1.5px dashed rgba(83,74,183,0.4)',
+                    borderRadius: 10, background: 'rgba(255,255,255,0.7)',
+                    cursor: 'pointer', fontSize: 12, color: '#534AB7',
+                    fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
-                  <span style={{ fontSize: 18 }}>📷</span>
-                  Upload your working or a diagram (optional)
+                  <span style={{ fontSize: 16 }}>📷</span> Take photo
                 </button>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  <img
-                    src={uploadedImagePreview}
-                    alt="Your uploaded working"
-                    style={{ width: '100%', borderRadius: 10, maxHeight: 200, objectFit: 'cover', border: '1.5px solid rgba(83,74,183,0.3)' }}
-                  />
-                  <button
-                    onClick={clearImage}
-                    style={{
-                      position: 'absolute', top: 8, right: 8,
-                      background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
-                      borderRadius: '50%', width: 28, height: 28, cursor: 'pointer',
-                      fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
-                  <div style={{ fontSize: 11, color: '#534AB7', marginTop: 6, textAlign: 'center' }}>
-                    ✅ Image ready — the tutor will analyse your working
-                  </div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageProcessing}
+                  style={{
+                    flex: 1, padding: '10px 8px',
+                    border: '1.5px dashed rgba(83,74,183,0.4)',
+                    borderRadius: 10, background: 'rgba(255,255,255,0.7)',
+                    cursor: 'pointer', fontSize: 12, color: '#534AB7',
+                    fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>📁</span> Upload file
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', marginBottom: 10 }}>
+                <img
+                  src={uploadedImagePreview}
+                  alt="Your uploaded working"
+                  style={{ width: '100%', borderRadius: 10, maxHeight: 180, objectFit: 'cover', border: '1.5px solid rgba(83,74,183,0.3)' }}
+                />
+                <button
+                  onClick={clearImage}
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
+                    borderRadius: '50%', width: 28, height: 28, cursor: 'pointer',
+                    fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  ✕
+                </button>
+                <div style={{ fontSize: 11, color: '#534AB7', marginTop: 6, textAlign: 'center' }}>
+                  ✅ Image ready — tutor will analyse your working
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {imageProcessing && (
+              <div style={{ fontSize: 12, color: '#534AB7', textAlign: 'center', marginBottom: 8 }}>
+                ⏳ Processing image...
+              </div>
+            )}
 
             {/* Ask button */}
             <button
               onClick={askTutor}
-              disabled={tutorLoading || !tutorQuestion.trim()}
+              disabled={tutorLoading || !tutorQuestion.trim() || imageProcessing}
               style={{
                 background: tutorLoading || !tutorQuestion.trim() ? '#9b93d4' : '#534AB7',
                 color: '#fff', border: 'none', borderRadius: 10,
