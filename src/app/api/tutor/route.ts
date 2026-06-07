@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { question, studentQuestion, subject, difficulty } = await request.json()
+    const body = await request.json()
+    const { question, studentQuestion, subject, difficulty, imageBase64, imageType } = body
 
     if (!question || !studentQuestion) {
       return NextResponse.json(
@@ -28,6 +29,8 @@ The exam question is:
 
 The student asks: "${studentQuestion}"
 
+${imageBase64 ? 'The student has also uploaded an image — this may show their working, a diagram, or notes. Please look at it carefully and give specific feedback on what you can see.' : ''}
+
 Please explain this clearly and simply, as if talking to an 11-13 year old Ugandan student. Use simple English. Use Ugandan examples where helpful (markets, farming, Lake Victoria, matoke, posho, shillings etc).
 
 If it is a maths word problem, break it down step by step:
@@ -36,7 +39,35 @@ If it is a maths word problem, break it down step by step:
 3. What operation do we use?
 4. How do we solve it?
 
-Be warm, encouraging and positive. End with a motivating phrase like "You can do this!" or "Practice makes perfect — keep going!". Keep your response under 150 words.`
+If the student uploaded their working, comment specifically on:
+- What they did correctly
+- Where they went wrong (if anywhere)
+- How to fix it
+
+Be warm, encouraging and positive. End with a motivating phrase. Keep your response under 200 words.`
+
+    // Build message content — text only or text + image
+    type ContentBlock =
+      | { type: 'text'; text: string }
+      | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
+
+    const userContent: ContentBlock[] = []
+
+    if (imageBase64) {
+      userContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: imageType || 'image/jpeg',
+          data: imageBase64,
+        },
+      })
+    }
+
+    userContent.push({
+      type: 'text',
+      text: prompt,
+    })
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -47,11 +78,11 @@ Be warm, encouraging and positive. End with a motivating phrase like "You can do
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: 400,
+        max_tokens: 500,
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content: userContent,
           },
         ],
       }),
