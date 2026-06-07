@@ -28,7 +28,7 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section style={{ background: 'linear-gradient(135deg, #534AB7 0%, #7F77DD 100%)', color: '#fff', padding: '56px 24px 64px', textAlign: 'center' }}>
         <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 16px', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
-          🇺🇬 Built for Uganda · P7 PLE 2025
+          🇺🇬 Built for Uganda · P7 PLE Preparation
         </div>
         <h1 style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, marginBottom: 16, maxWidth: 420, margin: '0 auto 16px' }}>
           Help your child achieve a Distinction in PLE
