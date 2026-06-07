@@ -55,7 +55,9 @@ export default function DashboardPage() {
     }
 
     setAllStudents(students)
-    const active = student ? students.find(s => s.id === student.id) || students[0] : students[0]
+    const active = student
+      ? students.find(s => s.id === student.id) || students[0]
+      : students[0]
     setStudent(active)
     await loadMastery(active.id)
     setLoading(false)
@@ -110,10 +112,8 @@ export default function DashboardPage() {
 
         {/* Sign out */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, position: 'relative' }}>
-          <button
-            onClick={handleSignOut}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
+          <button onClick={handleSignOut}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
             Sign out
           </button>
         </div>
@@ -129,10 +129,8 @@ export default function DashboardPage() {
             <div style={{ fontSize: 12, opacity: 0.7 }}>PLE {student?.ple_year} · {daysToExam} days to go</div>
           </div>
           {allStudents.length > 1 && (
-            <button
-              onClick={() => setShowSwitcher(s => !s)}
-              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
-            >
+            <button onClick={() => setShowSwitcher(s => !s)}
+              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
               Switch ▾
             </button>
           )}
@@ -142,17 +140,14 @@ export default function DashboardPage() {
         {showSwitcher && allStudents.length > 1 && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 8, position: 'relative', zIndex: 10 }}>
             {allStudents.map(s => (
-              <button
-                key={s.id}
-                onClick={() => switchStudent(s)}
+              <button key={s.id} onClick={() => switchStudent(s)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   width: '100%', padding: '10px 12px', border: 'none',
                   background: s.id === student?.id ? '#EEEDFE' : 'transparent',
                   borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
                   color: '#1a1a2e', textAlign: 'left',
-                }}
-              >
+                }}>
                 <span style={{ fontSize: 20 }}>{s.avatar_emoji}</span>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500 }}>{s.full_name}</div>
@@ -161,10 +156,8 @@ export default function DashboardPage() {
                 {s.id === student?.id && <span style={{ marginLeft: 'auto', color: '#534AB7', fontSize: 16 }}>✓</span>}
               </button>
             ))}
-            <button
-              onClick={() => { setShowSwitcher(false); router.push('/onboarding') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', color: '#534AB7', fontSize: 13, fontWeight: 500 }}
-            >
+            <button onClick={() => { setShowSwitcher(false); router.push('/onboarding') }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', color: '#534AB7', fontSize: 13, fontWeight: 500 }}>
               + Add another child
             </button>
           </div>
@@ -182,12 +175,12 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Daily challenge */}
+      {/* Action cards */}
       <div className="section-label">Today&apos;s Challenge</div>
-      <div
-        onClick={() => router.push('/session?subject=mathematics')}
-        style={{ margin: '0 16px 8px', background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderRadius: 12, padding: 16, cursor: 'pointer' }}
-      >
+
+      {/* Daily challenge */}
+      <div onClick={() => router.push('/session?subject=mathematics')}
+        style={{ margin: '0 16px 8px', background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderRadius: 12, padding: 16, cursor: 'pointer' }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5 }}>⚡ Daily Challenge</div>
         <div style={{ fontSize: 16, fontWeight: 500, color: '#0F6E56', marginBottom: 3 }}>Maths Word Problems</div>
         <div style={{ fontSize: 13, color: '#1D9E75', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -196,27 +189,33 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Mock exam card */}
-      <div
-        onClick={() => router.push('/mock')}
-        style={{ margin: '0 16px 8px', background: '#FAECE7', border: '0.5px solid rgba(216,90,48,0.25)', borderRadius: 12, padding: 16, cursor: 'pointer' }}
-      >
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#993C1D', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5 }}>📝 Mock Exam</div>
-        <div style={{ fontSize: 16, fontWeight: 500, color: '#993C1D', marginBottom: 3 }}>Test yourself under exam conditions</div>
-        <div style={{ fontSize: 13, color: '#D85A30', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Timed · PLE style · Grade projection</span>
-          <span style={{ fontSize: 18 }}>→</span>
+      {/* Two-column cards: Mock + AI Tutor */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 8px' }}>
+
+        {/* Mock exam */}
+        <div onClick={() => router.push('/mock')}
+          style={{ background: '#FAECE7', border: '0.5px solid rgba(216,90,48,0.25)', borderRadius: 12, padding: 14, cursor: 'pointer' }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>📝</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#993C1D', marginBottom: 3 }}>Mock Exam</div>
+          <div style={{ fontSize: 11, color: '#D85A30', lineHeight: 1.4 }}>Timed · PLE style · Grade</div>
+        </div>
+
+        {/* AI Tutor */}
+        <div onClick={() => router.push('/tutor')}
+          style={{ background: '#EEEDFE', border: '0.5px solid rgba(83,74,183,0.25)', borderRadius: 12, padding: 14, cursor: 'pointer' }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>🤖</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#3C3489', marginBottom: 3 }}>AI Tutor</div>
+          <div style={{ fontSize: 11, color: '#534AB7', lineHeight: 1.4 }}>Ask anything · Upload photos</div>
         </div>
       </div>
 
       {/* Subjects */}
       <div className="section-label">Subjects</div>
       <div style={{ padding: '0 16px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+
         {/* Maths featured */}
-        <div
-          onClick={() => router.push('/session?subject=mathematics')}
-          style={{ gridColumn: 'span 2', background: '#fff', border: '0.5px solid rgba(0,0,0,0.10)', borderRadius: 12, padding: 15, cursor: 'pointer', position: 'relative' }}
-        >
+        <div onClick={() => router.push('/session?subject=mathematics')}
+          style={{ gridColumn: 'span 2', background: '#fff', border: '0.5px solid rgba(0,0,0,0.10)', borderRadius: 12, padding: 15, cursor: 'pointer', position: 'relative' }}>
           <span style={{ position: 'absolute', top: 10, right: 10, background: '#FAEEDA', color: '#854F0B', fontSize: 10, padding: '3px 7px', borderRadius: 20, fontWeight: 500 }}>⭐ Focus</span>
           <div style={{ fontSize: 26, marginBottom: 8 }}>🔢</div>
           <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>Mathematics</div>
@@ -254,13 +253,23 @@ export default function DashboardPage() {
 
       <div style={{ flex: 1 }} />
 
-      {/* Bottom nav */}
+      {/* Bottom nav — 5 tabs */}
       <nav className="bottom-nav">
-        <button className="nav-btn active" onClick={() => router.push('/dashboard')}><span style={{ fontSize: 22 }}>🏠</span>Home</button>
-        <button className="nav-btn" onClick={() => router.push('/session?subject=mathematics')}><span style={{ fontSize: 22 }}>✏️</span>Practice</button>
-        <button className="nav-btn" onClick={() => router.push('/mock')}><span style={{ fontSize: 22 }}>📝</span>Mock</button>
-        <button className="nav-btn" onClick={() => router.push('/progress')}><span style={{ fontSize: 22 }}>📊</span>Progress</button>
-        <button className="nav-btn" onClick={() => router.push('/parent')}><span style={{ fontSize: 22 }}>👨‍👩‍👧</span>Parent</button>
+        <button className="nav-btn active" onClick={() => router.push('/dashboard')}>
+          <span style={{ fontSize: 20 }}>🏠</span>Home
+        </button>
+        <button className="nav-btn" onClick={() => router.push('/session?subject=mathematics')}>
+          <span style={{ fontSize: 20 }}>✏️</span>Practice
+        </button>
+        <button className="nav-btn" onClick={() => router.push('/tutor')}>
+          <span style={{ fontSize: 20 }}>🤖</span>Tutor
+        </button>
+        <button className="nav-btn" onClick={() => router.push('/mock')}>
+          <span style={{ fontSize: 20 }}>📝</span>Mock
+        </button>
+        <button className="nav-btn" onClick={() => router.push('/progress')}>
+          <span style={{ fontSize: 20 }}>📊</span>Progress
+        </button>
       </nav>
     </div>
   )
