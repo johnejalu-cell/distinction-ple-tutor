@@ -264,7 +264,7 @@ export default function LandingPage() {
             <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Premium</div>
             <div style={{ fontSize: 32, fontWeight: 700, color: '#fff', marginBottom: 4 }}>UGX 25,000 <span style={{ fontSize: 16, fontWeight: 400, opacity: 0.75 }}>/month</span></div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 16 }}>Pay via MTN or Airtel Mobile Money</div>
-            {['Everything in Free', 'Unlimited sessions daily', 'Priority AI Tutor access', 'Full mock exam library', 'Detailed progress reports', 'Up to 3 student profiles'].map(f => (
+            {['All free trial features included', 'Unlimited daily practice sessions', 'Full AI Tutor with image upload', 'Complete mock exam library', 'Detailed progress & weak area reports', 'Up to 3 student profiles'].map(f => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ color: '#FFD166', fontWeight: 600 }}>✓</span>
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>{f}</span>
