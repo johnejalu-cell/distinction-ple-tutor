@@ -392,10 +392,11 @@ export default function ProgressPage() {
 
       {/* Bottom nav */}
       <nav className="bottom-nav">
-        <button className="nav-btn" onClick={() => router.push('/dashboard')}><span style={{ fontSize: 22 }}>🏠</span>Home</button>
-        <button className="nav-btn" onClick={() => router.push('/session?subject=mathematics')}><span style={{ fontSize: 22 }}>✏️</span>Practice</button>
-        <button className="nav-btn active"><span style={{ fontSize: 22 }}>📊</span>Progress</button>
-        <button className="nav-btn" onClick={() => router.push('/parent')}><span style={{ fontSize: 22 }}>👨‍👩‍👧</span>Parent</button>
+        <button className="nav-btn" onClick={() => router.push('/dashboard')}><span style={{ fontSize: 20 }}>🏠</span>Home</button>
+        <button className="nav-btn" onClick={() => router.push('/session?subject=mathematics')}><span style={{ fontSize: 20 }}>✏️</span>Practice</button>
+        <button className="nav-btn" onClick={() => router.push('/tutor')}><span style={{ fontSize: 20 }}>🤖</span>Tutor</button>
+        <button className="nav-btn" onClick={() => router.push('/mock')}><span style={{ fontSize: 20 }}>📝</span>Mock</button>
+        <button className="nav-btn active"><span style={{ fontSize: 20 }}>📊</span>Progress</button>
       </nav>
     </div>
   )
