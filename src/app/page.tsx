@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export default function LandingPage() {
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#1a1a2e', background: '#fff' }}>
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#1a1a2e', background: '#fff', width: '100vw', marginLeft: 'calc(-50vw + 50%)', maxWidth: '100vw', overflowX: 'hidden' }}>
       <style>{`
         .lp-nav-inner { max-width: 1100px; margin: 0 auto; padding: 0 40px; display: flex; justify-content: space-between; align-items: center; }
         .lp-inner { max-width: 680px; margin: 0 auto; padding: 0 24px; }
