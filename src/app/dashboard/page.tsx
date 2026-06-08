@@ -253,6 +253,13 @@ export default function DashboardPage() {
 
       <div style={{ flex: 1 }} />
 
+      {/* About link */}
+      <div style={{ textAlign: 'center', padding: '12px 16px 4px' }}>
+        <a href="/" style={{ fontSize: 12, color: '#888780', textDecoration: 'none' }}>
+          🎓 About Distinction PLE Tutor
+        </a>
+      </div>
+
       {/* Bottom nav — 5 tabs */}
       <nav className="bottom-nav">
         <button className="nav-btn active" onClick={() => router.push('/dashboard')}>
