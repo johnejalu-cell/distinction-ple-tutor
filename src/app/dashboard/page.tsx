@@ -20,6 +20,13 @@ interface SubjectMastery {
   avg_mastery_pct: number
 }
 
+interface AccessStatus {
+  hasFullAccess: boolean
+  isTrial: boolean
+  isSubscribed: boolean
+  trialHoursLeft: number
+}
+
 export default function DashboardPage() {
   const [allStudents, setAllStudents] = useState<Student[]>([])
   const [student, setStudent] = useState<Student | null>(null)
@@ -27,6 +34,12 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [daysToExam, setDaysToExam] = useState(0)
   const [showSwitcher, setShowSwitcher] = useState(false)
+  const [access, setAccess] = useState<AccessStatus>({
+    hasFullAccess: true,
+    isTrial: true,
+    isSubscribed: false,
+    trialHoursLeft: 24,
+  })
   const router = useRouter()
   const supabase = createClient()
 
@@ -41,6 +54,31 @@ export default function DashboardPage() {
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+
+    // Check access status
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_subscribed, trial_started_at, subscription_expires_at')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      const now = new Date()
+      const trialStart = profile.trial_started_at ? new Date(profile.trial_started_at) : null
+      const hoursElapsed = trialStart ? (now.getTime() - trialStart.getTime()) / (1000 * 60 * 60) : 999
+      const trialActive = hoursElapsed < 24
+      const trialHoursLeft = trialActive ? Math.ceil(24 - hoursElapsed) : 0
+      const subscriptionActive = profile.is_subscribed &&
+        (!profile.subscription_expires_at || new Date(profile.subscription_expires_at) > now)
+      const hasFullAccess = trialActive || subscriptionActive
+
+      setAccess({
+        hasFullAccess,
+        isTrial: trialActive,
+        isSubscribed: subscriptionActive,
+        trialHoursLeft,
+      })
+    }
 
     const { data: students } = await supabase
       .from('students')
@@ -88,10 +126,14 @@ export default function DashboardPage() {
     return m ? Math.round(m.avg_mastery_pct) : 0
   }
 
+  function handleLockedFeature() {
+    router.push('/subscribe')
+  }
+
   const subjects = [
     { code: 'mathematics', name: 'Mathematics', icon: '🔢', color: '#BA7517', desc: 'Word problems, fractions, ratio' },
-    { code: 'english',     name: 'English',     icon: '📖', color: '#1D9E75', desc: 'Grammar, comprehension, vocab' },
-    { code: 'science',     name: 'Science',     icon: '🔬', color: '#534AB7', desc: 'Living things, energy, environment' },
+    { code: 'english', name: 'English', icon: '📖', color: '#1D9E75', desc: 'Grammar, comprehension, vocab' },
+    { code: 'science', name: 'Science', icon: '🔬', color: '#534AB7', desc: 'Living things, energy, environment' },
   ]
 
   if (loading) {
@@ -118,7 +160,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Student info + switcher */}
+        {/* Student info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', marginBottom: 10 }}>
           <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
             {student?.avatar_emoji}
@@ -136,18 +178,12 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Student switcher dropdown */}
+        {/* Switcher dropdown */}
         {showSwitcher && allStudents.length > 1 && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 8, position: 'relative', zIndex: 10 }}>
             {allStudents.map(s => (
               <button key={s.id} onClick={() => switchStudent(s)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  width: '100%', padding: '10px 12px', border: 'none',
-                  background: s.id === student?.id ? '#EEEDFE' : 'transparent',
-                  borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-                  color: '#1a1a2e', textAlign: 'left',
-                }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', border: 'none', background: s.id === student?.id ? '#EEEDFE' : 'transparent', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', color: '#1a1a2e', textAlign: 'left' }}>
                 <span style={{ fontSize: 20 }}>{s.avatar_emoji}</span>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500 }}>{s.full_name}</div>
@@ -175,45 +211,84 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Action cards */}
-      <div className="section-label">Today&apos;s Challenge</div>
+      {/* ── ACCESS BANNERS ── */}
 
-      {/* Daily challenge */}
+      {/* Trial active banner */}
+      {access.isTrial && access.hasFullAccess && (
+        <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.3)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 13, color: '#0F6E56' }}>
+            🎉 Free trial — <strong>{access.trialHoursLeft}h left</strong>. Full access enabled.
+          </div>
+          <button onClick={() => router.push('/subscribe')}
+            style={{ fontSize: 12, fontWeight: 500, color: '#0F6E56', background: 'none', border: '1px solid #1D9E75', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Upgrade
+          </button>
+        </div>
+      )}
+
+      {/* Limited access banner */}
+      {!access.hasFullAccess && !access.isSubscribed && (
+        <div style={{ background: '#FAEEDA', border: '0.5px solid rgba(186,117,23,0.3)', padding: '12px 16px' }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#854F0B', marginBottom: 4 }}>
+            ⚠️ You are on the Limited Free Plan
+          </div>
+          <div style={{ fontSize: 12, color: '#854F0B', marginBottom: 8, lineHeight: 1.5 }}>
+            Only <strong>3 practice questions per day</strong>. AI Tutor, Mock Exams and Progress tracking require a subscription.
+          </div>
+          <button onClick={() => router.push('/subscribe')}
+            style={{ background: '#BA7517', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Subscribe — UGX 25,000/month →
+          </button>
+        </div>
+      )}
+
+      {/* Today's challenge */}
+      <div className="section-label">Today&apos;s Challenge</div>
       <div onClick={() => router.push('/session?subject=mathematics')}
         style={{ margin: '0 16px 8px', background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderRadius: 12, padding: 16, cursor: 'pointer' }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5 }}>⚡ Daily Challenge</div>
         <div style={{ fontSize: 16, fontWeight: 500, color: '#0F6E56', marginBottom: 3 }}>Maths Word Problems</div>
         <div style={{ fontSize: 13, color: '#1D9E75', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Fractions &amp; Ratios · 5 questions</span>
+          <span>{access.hasFullAccess ? 'Fractions & Ratios · 5 questions' : 'Limited · 3 questions only'}</span>
           <span style={{ fontSize: 18 }}>→</span>
         </div>
       </div>
 
-      {/* Two-column cards: Mock + AI Tutor */}
+      {/* Mock + AI Tutor cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '0 16px 8px' }}>
 
         {/* Mock exam */}
-        <div onClick={() => router.push('/mock')}
-          style={{ background: '#FAECE7', border: '0.5px solid rgba(216,90,48,0.25)', borderRadius: 12, padding: 14, cursor: 'pointer' }}>
+        <div
+          onClick={() => access.hasFullAccess ? router.push('/mock') : handleLockedFeature()}
+          style={{ background: access.hasFullAccess ? '#FAECE7' : '#F1EFE8', border: `0.5px solid ${access.hasFullAccess ? 'rgba(216,90,48,0.25)' : 'rgba(0,0,0,0.08)'}`, borderRadius: 12, padding: 14, cursor: 'pointer', position: 'relative' }}>
+          {!access.hasFullAccess && (
+            <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 14 }}>🔒</div>
+          )}
           <div style={{ fontSize: 20, marginBottom: 6 }}>📝</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#993C1D', marginBottom: 3 }}>Mock Exam</div>
-          <div style={{ fontSize: 11, color: '#D85A30', lineHeight: 1.4 }}>Timed · PLE style · Grade</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: access.hasFullAccess ? '#993C1D' : '#888780', marginBottom: 3 }}>Mock Exam</div>
+          <div style={{ fontSize: 11, color: access.hasFullAccess ? '#D85A30' : '#888780', lineHeight: 1.4 }}>
+            {access.hasFullAccess ? 'Timed · PLE style · Grade' : 'Premium only'}
+          </div>
         </div>
 
         {/* AI Tutor */}
-        <div onClick={() => router.push('/tutor')}
-          style={{ background: '#EEEDFE', border: '0.5px solid rgba(83,74,183,0.25)', borderRadius: 12, padding: 14, cursor: 'pointer' }}>
+        <div
+          onClick={() => access.hasFullAccess ? router.push('/tutor') : handleLockedFeature()}
+          style={{ background: access.hasFullAccess ? '#EEEDFE' : '#F1EFE8', border: `0.5px solid ${access.hasFullAccess ? 'rgba(83,74,183,0.25)' : 'rgba(0,0,0,0.08)'}`, borderRadius: 12, padding: 14, cursor: 'pointer', position: 'relative' }}>
+          {!access.hasFullAccess && (
+            <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 14 }}>🔒</div>
+          )}
           <div style={{ fontSize: 20, marginBottom: 6 }}>🤖</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#3C3489', marginBottom: 3 }}>AI Tutor</div>
-          <div style={{ fontSize: 11, color: '#534AB7', lineHeight: 1.4 }}>Ask anything · Upload photos</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: access.hasFullAccess ? '#3C3489' : '#888780', marginBottom: 3 }}>AI Tutor</div>
+          <div style={{ fontSize: 11, color: access.hasFullAccess ? '#534AB7' : '#888780', lineHeight: 1.4 }}>
+            {access.hasFullAccess ? 'Ask anything · Upload photos' : 'Premium only'}
+          </div>
         </div>
       </div>
 
       {/* Subjects */}
       <div className="section-label">Subjects</div>
       <div style={{ padding: '0 16px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-
-        {/* Maths featured */}
         <div onClick={() => router.push('/session?subject=mathematics')}
           style={{ gridColumn: 'span 2', background: '#fff', border: '0.5px solid rgba(0,0,0,0.10)', borderRadius: 12, padding: 15, cursor: 'pointer', position: 'relative' }}>
           <span style={{ position: 'absolute', top: 10, right: 10, background: '#FAEEDA', color: '#854F0B', fontSize: 10, padding: '3px 7px', borderRadius: 20, fontWeight: 500 }}>⭐ Focus</span>
@@ -260,7 +335,7 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      {/* Bottom nav — 5 tabs */}
+      {/* Bottom nav */}
       <nav className="bottom-nav">
         <button className="nav-btn active" onClick={() => router.push('/dashboard')}>
           <span style={{ fontSize: 20 }}>🏠</span>Home
@@ -268,14 +343,14 @@ export default function DashboardPage() {
         <button className="nav-btn" onClick={() => router.push('/session?subject=mathematics')}>
           <span style={{ fontSize: 20 }}>✏️</span>Practice
         </button>
-        <button className="nav-btn" onClick={() => router.push('/tutor')}>
-          <span style={{ fontSize: 20 }}>🤖</span>Tutor
+        <button className="nav-btn" onClick={() => access.hasFullAccess ? router.push('/tutor') : handleLockedFeature()}>
+          <span style={{ fontSize: 20 }}>{access.hasFullAccess ? '🤖' : '🔒'}</span>Tutor
         </button>
-        <button className="nav-btn" onClick={() => router.push('/mock')}>
-          <span style={{ fontSize: 20 }}>📝</span>Mock
+        <button className="nav-btn" onClick={() => access.hasFullAccess ? router.push('/mock') : handleLockedFeature()}>
+          <span style={{ fontSize: 20 }}>{access.hasFullAccess ? '📝' : '🔒'}</span>Mock
         </button>
-        <button className="nav-btn" onClick={() => router.push('/progress')}>
-          <span style={{ fontSize: 20 }}>📊</span>Progress
+        <button className="nav-btn" onClick={() => access.hasFullAccess ? router.push('/progress') : handleLockedFeature()}>
+          <span style={{ fontSize: 20 }}>{access.hasFullAccess ? '📊' : '🔒'}</span>Progress
         </button>
       </nav>
     </div>
