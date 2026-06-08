@@ -59,6 +59,7 @@ function SessionContent() {
   const [studentId, setStudentId] = useState<string | null>(null)
   const [points, setPoints] = useState(0)
   const [correct, setCorrect] = useState(0)
+  const correctRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [showHint, setShowHint] = useState(false)
   const [hintLevel, setHintLevel] = useState(0)
@@ -193,7 +194,7 @@ function SessionContent() {
     setAnswered(true)
     const q = questions[current]
     const isCorrect = selected === q.correct_answer
-    if (isCorrect) { setCorrect(c => c + 1); setPoints(p => p + 20) }
+    if (isCorrect) { correctRef.current += 1; setCorrect(correctRef.current); setPoints(p => p + 20) }
     if (sessionId && studentId) {
       await supabase.from('session_responses').insert({
         session_id: sessionId, student_id: studentId, question_id: q.id,
@@ -207,13 +208,13 @@ function SessionContent() {
   async function nextQuestion() {
     if (current + 1 >= questions.length) {
       const lastCorrect = selected === questions[current].correct_answer
-      const finalCorrect = correct + (lastCorrect ? 1 : 0)
+      const finalCorrect = correctRef.current
       if (sessionId) {
         await supabase.from('sessions').update({
           ended_at: new Date().toISOString(),
           correct_count: finalCorrect,
           wrong_count: questions.length - finalCorrect,
-          points_earned: points + (lastCorrect ? 20 : 0),
+          points_earned: correctRef.current * 20,
           hints_used: hintLevel,
         }).eq('id', sessionId)
       }
@@ -230,7 +231,7 @@ function SessionContent() {
             ? s.current_streak_days + 1
             : s.last_active_date === today ? s.current_streak_days : 1
           await supabase.from('students').update({
-            total_points: s.total_points + points + (lastCorrect ? 20 : 0),
+            total_points: s.total_points + (correctRef.current * 20),
             current_streak_days: newStreak,
             last_active_date: today,
           }).eq('id', studentId)
@@ -320,7 +321,7 @@ function SessionContent() {
 
   if (done) {
     const total = questions.length
-    const pct = Math.round((correct / total) * 100)
+    const pct = Math.round((correctRef.current / total) * 100)
     const medal = pct >= 80 ? '🏆' : pct >= 60 ? '🥈' : '🥉'
     const title = pct >= 80 ? 'Excellent work!' : pct >= 60 ? 'Good effort!' : 'Keep practising!'
     const grade = pct >= 91 ? 'D1' : pct >= 81 ? 'D2' : pct >= 71 ? 'D3' : pct >= 61 ? 'D4' : pct >= 51 ? 'D5' : 'D6'
@@ -343,8 +344,8 @@ function SessionContent() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, width: '100%', marginBottom: 24 }}>
           {[
-            { label: 'Correct', value: correct, color: '#1D9E75' },
-            { label: 'Wrong', value: total - correct, color: '#A32D2D' },
+            { label: 'Correct', value: correctRef.current, color: '#1D9E75' },
+            { label: 'Wrong', value: total - correctRef.current, color: '#A32D2D' },
             { label: 'Points', value: `+${points}`, color: '#BA7517' },
           ].map(s => (
             <div key={s.label} style={{ background: '#F1EFE8', borderRadius: 8, padding: 12 }}>
@@ -353,7 +354,7 @@ function SessionContent() {
             </div>
           ))}
         </div>
-        <button className="btn-primary" onClick={() => { setCurrent(0); setSelected(null); setAnswered(false); setCorrect(0); setPoints(0); setDone(false); setShowTutor(false); setTutorResponse(''); init() }}>
+        <button className="btn-primary" onClick={() => { setCurrent(0); setSelected(null); setAnswered(false); setCorrect(0); correctRef.current = 0; setPoints(0); setDone(false); setShowTutor(false); setTutorResponse(''); init() }}>
           Try again
         </button>
         <button className="btn-secondary" style={{ marginTop: 10 }} onClick={() => router.push('/dashboard')}>
