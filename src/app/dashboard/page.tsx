@@ -288,7 +288,7 @@ export default function DashboardPage() {
 
       {/* Revision Mode card */}
       <div
-        onClick={() => access.hasFullAccess ? router.push('/revision?subject=mathematics') : handleLockedFeature()}
+        onClick={() => access.hasFullAccess ? router.push('/revision/select') : handleLockedFeature()}
         style={{ margin: '0 16px 8px', background: access.hasFullAccess ? '#FAEEDA' : '#F1EFE8', border: `0.5px solid ${access.hasFullAccess ? 'rgba(186,117,23,0.25)' : 'rgba(0,0,0,0.08)'}`, borderRadius: 12, padding: 16, cursor: 'pointer', position: 'relative' }}>
         {!access.hasFullAccess && (
           <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 16 }}>🔒</div>
