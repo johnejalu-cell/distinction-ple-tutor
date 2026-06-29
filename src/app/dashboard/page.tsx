@@ -286,6 +286,23 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Revision Mode card */}
+      <div
+        onClick={() => access.hasFullAccess ? router.push('/revision?subject=mathematics') : handleLockedFeature()}
+        style={{ margin: '0 16px 8px', background: access.hasFullAccess ? '#FAEEDA' : '#F1EFE8', border: `0.5px solid ${access.hasFullAccess ? 'rgba(186,117,23,0.25)' : 'rgba(0,0,0,0.08)'}`, borderRadius: 12, padding: 16, cursor: 'pointer', position: 'relative' }}>
+        {!access.hasFullAccess && (
+          <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 16 }}>🔒</div>
+        )}
+        <div style={{ fontSize: 11, fontWeight: 600, color: access.hasFullAccess ? '#854F0B' : '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5 }}>📖 Revision Mode</div>
+        <div style={{ fontSize: 16, fontWeight: 500, color: access.hasFullAccess ? '#854F0B' : '#888780', marginBottom: 3 }}>
+          Unlimited practice for exam prep
+        </div>
+        <div style={{ fontSize: 13, color: access.hasFullAccess ? '#BA7517' : '#888780', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{access.hasFullAccess ? 'No limits · Pick any subject' : 'Premium only'}</span>
+          <span style={{ fontSize: 18 }}>{access.hasFullAccess ? '→' : ''}</span>
+        </div>
+      </div>
+
       {/* Subjects */}
       <div className="section-label">Subjects</div>
       <div style={{ padding: '0 16px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -356,3 +373,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+
