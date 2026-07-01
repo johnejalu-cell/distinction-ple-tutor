@@ -132,7 +132,7 @@ function RevisionContent() {
     recentIds: Set<string>,
     seenIds: Set<string>
   ) {
-    const excludeIds = new Set([...recentIds, ...seenIds])
+    const excludeIds = new Set([...Array.from(recentIds), ...Array.from(seenIds)])
     const freshIds = allSubjectQIds.current.filter(id => !excludeIds.has(id))
 
     if (freshIds.length > 0) {
@@ -153,7 +153,7 @@ function RevisionContent() {
     }
 
     // No fresh questions — load recently seen ones (excluding only this session)
-    const excludeThisSession = seenIds
+    const excludeThisSession = Array.from(seenIds)
     const recycleIds = allSubjectQIds.current.filter(id => !excludeThisSession.has(id))
 
     if (recycleIds.length > 0) {
