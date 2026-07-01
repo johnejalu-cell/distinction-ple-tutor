@@ -20,13 +20,11 @@ interface Question {
 
 function RevisionContent() {
   const [questions, setQuestions] = useState<Question[]>([])
-  const [usedIds, setUsedIds] = useState<string[]>([])
   const [current, setCurrent] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
   const [answered, setAnswered] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [studentId, setStudentId] = useState<string | null>(null)
-  const [subjectId, setSubjectId] = useState<string | null>(null)
   const [subtopicIds, setSubtopicIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -34,8 +32,15 @@ function RevisionContent() {
   const [hintLevel, setHintLevel] = useState(0)
   const [done, setDone] = useState(false)
   const [subjectName, setSubjectName] = useState('')
-  const [hasFullAccess, setHasFullAccess] = useState(true)
   const [startTime] = useState(Date.now())
+  const [allExhausted, setAllExhausted] = useState(false)
+
+  // Track all question IDs seen this session
+  const seenThisSession = useRef<Set<string>>(new Set())
+  // Track recently answered from DB (last 7 days)
+  const recentlyAnswered = useRef<Set<string>>(new Set())
+  // All available question IDs for this subject
+  const allSubjectQIds = useRef<string[]>([])
 
   const correctCountRef = useRef(0)
   const totalAnsweredRef = useRef(0)
@@ -50,39 +55,35 @@ function RevisionContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Check access — Revision Mode is premium only
+    // Check access
     const { data: profile } = await supabase
       .from('profiles')
       .select('is_subscribed, trial_started_at, subscription_expires_at')
       .eq('id', user.id)
       .single()
 
-    let fullAccess = true
     if (profile) {
       const now = new Date()
       const trialStart = profile.trial_started_at ? new Date(profile.trial_started_at) : null
       const trialActive = trialStart ? (now.getTime() - trialStart.getTime()) < 24 * 60 * 60 * 1000 : false
       const subscriptionActive = profile.is_subscribed &&
         (!profile.subscription_expires_at || new Date(profile.subscription_expires_at) > now)
-      fullAccess = trialActive || subscriptionActive
-    }
-    setHasFullAccess(fullAccess)
-
-    if (!fullAccess) {
-      router.push('/subscribe')
-      return
+      if (!trialActive && !subscriptionActive) {
+        router.push('/subscribe')
+        return
+      }
     }
 
     const { data: students } = await supabase
       .from('students').select('id').eq('parent_id', user.id).limit(1)
     if (!students?.length) { router.push('/onboarding'); return }
-    setStudentId(students[0].id)
+    const sid = students[0].id
+    setStudentId(sid)
 
     const { data: subject } = await supabase
       .from('subjects').select('id, name').eq('code', subjectCode).single()
     if (!subject) { router.push('/dashboard'); return }
     setSubjectName(subject.name)
-    setSubjectId(subject.id)
 
     const { data: subtopics } = await supabase
       .from('subtopics')
@@ -90,63 +91,101 @@ function RevisionContent() {
       .eq('topics.subject_id', subject.id)
 
     if (!subtopics?.length) { router.push('/dashboard'); return }
-    const allSubtopicIds = subtopics.map(s => s.id)
-    setSubtopicIds(allSubtopicIds)
+    const allSubIds = subtopics.map(s => s.id)
+    setSubtopicIds(allSubIds)
 
-    // Load first batch
-    const { data: qs } = await supabase
+    // Get ALL question IDs for this subject so we know total pool size
+    const { data: allQIds } = await supabase
       .from('questions')
-      .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-      .in('subtopic_id', allSubtopicIds)
+      .select('id')
+      .in('subtopic_id', allSubIds)
       .eq('is_active', true)
-      .limit(15)
+    allSubjectQIds.current = (allQIds || []).map(q => q.id)
 
-    if (!qs?.length) { router.push('/dashboard'); return }
+    // Get questions answered in last 7 days for this student
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const shuffled = qs.sort(() => Math.random() - 0.5)
-    setQuestions(shuffled)
-    setUsedIds(shuffled.map(q => q.id))
+    const { data: recentResponses } = await supabase
+      .from('session_responses')
+      .select('question_id')
+      .eq('student_id', sid)
+      .gte('answered_at', sevenDaysAgo.toISOString())
 
-    // Create a revision session
+    const recentIds = new Set((recentResponses || []).map(r => r.question_id))
+    recentlyAnswered.current = recentIds
+
+    // Create session
     const { data: session } = await supabase
       .from('sessions')
-      .insert({ student_id: students[0].id, session_type: 'revision', subject_id: subject.id, total_questions: 0 })
+      .insert({ student_id: sid, session_type: 'revision', subject_id: subject.id, total_questions: 0 })
       .select('id').single()
-
     if (session) setSessionId(session.id)
+
+    // Load first batch — prioritise unseen questions
+    await loadBatch(allSubIds, recentIds, new Set())
     setLoading(false)
   }
 
-  async function loadMoreQuestions() {
-    if (loadingMore || subtopicIds.length === 0) return
-    setLoadingMore(true)
+  async function loadBatch(
+    subIds: string[],
+    recentIds: Set<string>,
+    seenIds: Set<string>
+  ) {
+    const excludeIds = new Set([...recentIds, ...seenIds])
+    const freshIds = allSubjectQIds.current.filter(id => !excludeIds.has(id))
 
+    if (freshIds.length > 0) {
+      // Load fresh (never seen recently) questions first
+      const { data: qs } = await supabase
+        .from('questions')
+        .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
+        .in('id', freshIds)
+        .eq('is_active', true)
+        .limit(15)
+
+      if (qs && qs.length > 0) {
+        const shuffled = qs.sort(() => Math.random() - 0.5)
+        setQuestions(prev => [...prev, ...shuffled])
+        shuffled.forEach(q => seenThisSession.current.add(q.id))
+        return
+      }
+    }
+
+    // No fresh questions — load recently seen ones (excluding only this session)
+    const excludeThisSession = seenIds
+    const recycleIds = allSubjectQIds.current.filter(id => !excludeThisSession.has(id))
+
+    if (recycleIds.length > 0) {
+      const { data: qs } = await supabase
+        .from('questions')
+        .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
+        .in('id', recycleIds)
+        .eq('is_active', true)
+        .limit(15)
+
+      if (qs && qs.length > 0) {
+        const shuffled = qs.sort(() => Math.random() - 0.5)
+        setQuestions(prev => [...prev, ...shuffled])
+        shuffled.forEach(q => seenThisSession.current.add(q.id))
+        setAllExhausted(true) // signal that we're now recycling
+        return
+      }
+    }
+
+    // Absolute fallback — reset and reload everything
+    seenThisSession.current.clear()
     const { data: qs } = await supabase
       .from('questions')
       .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-      .in('subtopic_id', subtopicIds)
+      .in('subtopic_id', subIds)
       .eq('is_active', true)
-      .not('id', 'in', `(${usedIds.join(',')})`)
       .limit(15)
-
-    if (qs && qs.length > 0) {
+    if (qs) {
       const shuffled = qs.sort(() => Math.random() - 0.5)
       setQuestions(prev => [...prev, ...shuffled])
-      setUsedIds(prev => [...prev, ...shuffled.map(q => q.id)])
-    } else {
-      // Ran out of fresh questions — recycle from the start
-      const { data: allQs } = await supabase
-        .from('questions')
-        .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-        .in('subtopic_id', subtopicIds)
-        .eq('is_active', true)
-        .limit(15)
-      if (allQs) {
-        const shuffled = allQs.sort(() => Math.random() - 0.5)
-        setQuestions(prev => [...prev, ...shuffled])
-      }
+      shuffled.forEach(q => seenThisSession.current.add(q.id))
     }
-    setLoadingMore(false)
   }
 
   async function submitAnswer() {
@@ -156,6 +195,9 @@ function RevisionContent() {
     const isCorrect = selected === q.correct_answer
     totalAnsweredRef.current += 1
     if (isCorrect) correctCountRef.current += 1
+
+    // Mark as recently answered so future sessions deprioritise it
+    recentlyAnswered.current.add(q.id)
 
     if (sessionId && studentId) {
       await supabase.from('session_responses').insert({
@@ -168,9 +210,11 @@ function RevisionContent() {
   }
 
   async function nextQuestion() {
-    // Load more questions when getting close to the end
-    if (current + 3 >= questions.length) {
-      loadMoreQuestions()
+    // Load more when 3 from the end
+    if (current + 3 >= questions.length && !loadingMore) {
+      setLoadingMore(true)
+      await loadBatch(subtopicIds, recentlyAnswered.current, seenThisSession.current)
+      setLoadingMore(false)
     }
 
     setCurrent(c => c + 1)
@@ -182,13 +226,12 @@ function RevisionContent() {
 
   async function endSession() {
     if (sessionId) {
-      const timeSpent = Math.round((Date.now() - startTime) / 1000)
       await supabase.from('sessions').update({
         ended_at: new Date().toISOString(),
         correct_count: correctCountRef.current,
         wrong_count: totalAnsweredRef.current - correctCountRef.current,
         total_questions: totalAnsweredRef.current,
-        points_earned: 0, // revision mode doesn't earn points
+        points_earned: 0,
       }).eq('id', sessionId)
     }
     setDone(true)
@@ -213,9 +256,7 @@ function RevisionContent() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', minHeight: '100vh', textAlign: 'center' }}>
         <div style={{ fontSize: 60, marginBottom: 12 }}>📖</div>
         <div style={{ fontSize: 22, fontWeight: 500, marginBottom: 6 }}>Revision Complete!</div>
-        <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 24 }}>
-          Great work revising {subjectName}
-        </div>
+        <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 24 }}>Great work revising {subjectName}</div>
 
         <div style={{ background: '#EEEDFE', borderRadius: 12, padding: 20, width: '100%', marginBottom: 18 }}>
           <div style={{ fontSize: 44, fontWeight: 500, color: '#3C3489' }}>{pct}%</div>
@@ -235,12 +276,12 @@ function RevisionContent() {
           ))}
         </div>
 
-        <div style={{ background: '#E1F5EE', borderRadius: 10, padding: 12, width: '100%', marginBottom: 20, fontSize: 13, color: '#0F6E56' }}>
-          💡 Revision sessions update your mastery levels but don&apos;t count toward daily points or streaks — those come from your Daily Challenge.
+        <div style={{ background: '#E1F5EE', borderRadius: 10, padding: 12, width: '100%', marginBottom: 20, fontSize: 13, color: '#0F6E56', textAlign: 'left' }}>
+          💡 Questions you answered today will be deprioritised in your next revision session — new questions come first.
         </div>
 
-        <button className="btn-primary" onClick={() => { setCurrent(0); setDone(false); correctCountRef.current = 0; totalAnsweredRef.current = 0; init() }}>
-          Revise again
+        <button className="btn-primary" onClick={() => router.push('/revision/select')}>
+          Revise another subject
         </button>
         <button className="btn-secondary" style={{ marginTop: 10 }} onClick={() => router.push('/dashboard')}>
           Back to home
@@ -258,6 +299,7 @@ function RevisionContent() {
       </div>
     )
   }
+
   const isCorrect = selected === q.correct_answer
 
   return (
@@ -265,23 +307,27 @@ function RevisionContent() {
       {/* Top bar */}
       <div className="topbar">
         <button className="topbar-back" onClick={() => { if (confirm('End revision session?')) endSession() }}>✕</button>
-        <div className="topbar-title">
-          📖 {subjectName} Revision
-        </div>
+        <div className="topbar-title">📖 {subjectName} Revision</div>
         <div style={{ background: '#EEEDFE', color: '#3C3489', fontSize: 13, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
-          Q{totalAnsweredRef.current + (answered ? 0 : 1)}
+          Q{totalAnsweredRef.current + 1}
         </div>
       </div>
 
-      {/* Running stats bar */}
+      {/* Running stats */}
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 16px', background: '#F8F9FF', fontSize: 12, color: '#5F5E5A', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
         <span>✅ {correctCountRef.current} correct</span>
         <span>❌ {totalAnsweredRef.current - correctCountRef.current} wrong</span>
         <span>📊 {totalAnsweredRef.current > 0 ? Math.round((correctCountRef.current / totalAnsweredRef.current) * 100) : 0}% accuracy</span>
       </div>
 
-      <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
+      {/* Recycling notice */}
+      {allExhausted && (
+        <div style={{ background: '#FAEEDA', padding: '8px 16px', fontSize: 12, color: '#854F0B', textAlign: 'center' }}>
+          🔄 You&apos;ve seen all fresh questions — cycling through earlier ones
+        </div>
+      )}
 
+      <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
         {/* Subject tag */}
         <div style={{
           fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20,
@@ -370,7 +416,7 @@ function RevisionContent() {
         ) : (
           <>
             <button className="btn-primary" style={{ background: '#1D9E75', marginBottom: 9 }} onClick={nextQuestion}>
-              Next Question →
+              {loadingMore ? 'Loading...' : 'Next Question →'}
             </button>
             <button className="btn-secondary" onClick={endSession}>
               🏁 End revision session
