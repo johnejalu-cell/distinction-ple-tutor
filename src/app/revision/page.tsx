@@ -153,8 +153,7 @@ function RevisionContent() {
     }
 
     // No fresh questions — load recently seen ones (excluding only this session)
-    const excludeThisSession = Array.from(seenIds)
-    const recycleIds = allSubjectQIds.current.filter(id => !excludeThisSession.has(id))
+    const recycleIds = allSubjectQIds.current.filter(id => !seenIds.has(id))
 
     if (recycleIds.length > 0) {
       const { data: qs } = await supabase
