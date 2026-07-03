@@ -261,7 +261,7 @@ export default function DashboardPage() {
           </div>
           <button onClick={() => router.push('/subscribe')}
             style={{ background: '#BA7517', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Subscribe — UGX 25,000/month →
+            Subscribe — UGX 8,000/month →
           </button>
         </div>
       )}
