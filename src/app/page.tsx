@@ -31,8 +31,8 @@ export default function LandingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 24 }}>🎓</span>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#534AB7', lineHeight: 1 }}>Distinction</div>
-              <div style={{ fontSize: 11, color: '#888780', lineHeight: 1 }}>PLE Tutor</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#534AB7', lineHeight: 1 }}>Get Ready 4 PLE</div>
+              
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -55,7 +55,7 @@ export default function LandingPage() {
             Help your child achieve a Distinction in PLE
           </h1>
           <p style={{ fontSize: 'clamp(15px, 2vw, 18px)', opacity: 0.88, lineHeight: 1.7, marginBottom: 36, maxWidth: 560, margin: '0 auto 36px' }}>
-            Uganda&apos;s first AI-powered P7 tutor with adaptive learning. Personalised practice in Maths, English and Science — identifying your child&apos;s weak areas and focusing on them until mastered.
+            Smart AI tutoring and exam revision for PLE preparation. Personalised practice in Maths, English and Science — with an AI tutor that adapts to your child&apos;s needs.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" style={{ fontSize: 16, fontWeight: 600, color: '#534AB7', background: '#fff', padding: '15px 32px', borderRadius: 12, textDecoration: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
@@ -95,7 +95,7 @@ export default function LandingPage() {
             The Primary Leaving Examination determines which secondary school your child attends. Yet most P7 students lack access to personalised academic support — class sizes are large, teacher time is limited, and revision materials are generic rather than tailored to each child&apos;s specific gaps.
           </p>
           <p style={{ fontSize: 15, color: '#5F5E5A', lineHeight: 1.85 }}>
-            Distinction PLE Tutor changes that. For less than the cost of one private tuition session, your child gets a dedicated AI tutor available every day — adapting to their specific weaknesses and building their confidence question by question.
+            Get Ready 4 PLE changes that. For less than the cost of one private tuition session, your child gets a dedicated AI tutor available every day — adapting to their specific weaknesses and building their confidence question by question.
           </p>
         </div>
       </section>
@@ -203,7 +203,7 @@ export default function LandingPage() {
             <div style={{ fontSize: 40, marginBottom: 12 }}>🎓</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#534AB7', marginBottom: 8 }}>Endorsement Coming Soon</div>
             <div style={{ fontSize: 13, color: '#888780', lineHeight: 1.6 }}>
-              We are working with leading Ugandan education professionals to review and endorse Distinction PLE Tutor. Their testimonial will appear here shortly.
+              We are working with leading Ugandan education professionals to review and endorse Get Ready 4 PLE. Their testimonial will appear here shortly.
             </div>
           </div>
 
@@ -298,10 +298,10 @@ export default function LandingPage() {
       <section style={{ background: 'linear-gradient(135deg, #534AB7 0%, #7F77DD 100%)', padding: '72px 24px', textAlign: 'center', color: '#fff' }}>
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <div style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontWeight: 700, marginBottom: 16, lineHeight: 1.3 }}>
-            Give your child the best chance at a Distinction
+            Give your child the best chance at PLE success
           </div>
           <p style={{ fontSize: 16, opacity: 0.85, marginBottom: 36, lineHeight: 1.7 }}>
-            Join families across Uganda who are using Distinction PLE Tutor to prepare their children for the most important exam of primary school.
+            Join families across Uganda who are using Get Ready 4 PLE to prepare their children for the most important exam of primary school.
           </p>
           <Link href="/login" style={{ display: 'inline-block', fontSize: 17, fontWeight: 600, color: '#534AB7', background: '#fff', padding: '16px 40px', borderRadius: 14, textDecoration: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
             Start your 3-day free trial →
@@ -315,10 +315,10 @@ export default function LandingPage() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 22 }}>🎓</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#534AB7' }}>Distinction PLE Tutor</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#534AB7' }}>Get Ready 4 PLE</span>
           </div>
           <p style={{ fontSize: 12, color: '#888780' }}>
-            Helping Uganda&apos;s P7 students achieve their best in the Primary Leaving Examination.
+            Smart AI tutoring and exam revision for PLE preparation.
           </p>
           <div style={{ display: 'flex', gap: 20 }}>
             <Link href="/dashboard" style={{ fontSize: 12, color: '#534AB7', textDecoration: 'none' }}>Dashboard</Link>
@@ -327,10 +327,11 @@ export default function LandingPage() {
           </div>
         </div>
         <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <p style={{ fontSize: 11, color: '#888780' }}>© 2025 Distinction PLE Tutor. All rights reserved.</p>
+          <p style={{ fontSize: 11, color: '#888780' }}>© 2025 Get Ready 4 PLE. All rights reserved.</p>
         </div>
       </footer>
 
     </div>
   )
 }
+
