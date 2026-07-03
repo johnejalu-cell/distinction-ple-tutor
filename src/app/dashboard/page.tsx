@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [daysToExam, setDaysToExam] = useState(0)
   const [showSwitcher, setShowSwitcher] = useState(false)
+  const [weakSubtopic, setWeakSubtopic] = useState<{ subject: string; subjectCode: string; subtopic: string } | null>(null)
   const [access, setAccess] = useState<AccessStatus>({
     hasFullAccess: true,
     isTrial: true,
@@ -98,6 +99,7 @@ export default function DashboardPage() {
       : students[0]
     setStudent(active)
     await loadMastery(active.id)
+    await loadWeakSubtopic(active.id)
     setLoading(false)
   }
 
@@ -107,6 +109,28 @@ export default function DashboardPage() {
       .select('*')
       .eq('student_id', studentId)
     setMasteries(m || [])
+  }
+
+  async function loadWeakSubtopic(studentId: string) {
+    const { data } = await supabase
+      .from('v_weak_subtopics')
+      .select('subject_name, subtopic_name')
+      .eq('student_id', studentId)
+      .order('mastery_pct', { ascending: true })
+      .limit(1)
+
+    if (data && data.length > 0) {
+      const w = data[0]
+      const subjectName = w.subject_name || ''
+      let subjectCode = 'mathematics'
+      if (subjectName.toLowerCase().includes('english')) subjectCode = 'english'
+      else if (subjectName.toLowerCase().includes('science')) subjectCode = 'science'
+      setWeakSubtopic({
+        subject: subjectName,
+        subjectCode,
+        subtopic: w.subtopic_name || '',
+      })
+    }
   }
 
   async function switchStudent(s: Student) {
@@ -244,12 +268,19 @@ export default function DashboardPage() {
 
       {/* Today's challenge */}
       <div className="section-label">Today&apos;s Challenge</div>
-      <div onClick={() => router.push('/session?subject=mathematics')}
+      <div onClick={() => router.push(\`/session?subject=\${weakSubtopic ? weakSubtopic.subjectCode : 'mathematics'}\`)}
         style={{ margin: '0 16px 8px', background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderRadius: 12, padding: 16, cursor: 'pointer' }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5 }}>⚡ Daily Challenge</div>
-        <div style={{ fontSize: 16, fontWeight: 500, color: '#0F6E56', marginBottom: 3 }}>Maths Word Problems</div>
+        <div style={{ fontSize: 16, fontWeight: 500, color: '#0F6E56', marginBottom: 3 }}>
+          {weakSubtopic ? weakSubtopic.subject : 'Mathematics'}
+        </div>
         <div style={{ fontSize: 13, color: '#1D9E75', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>{access.hasFullAccess ? 'Fractions & Ratios · 5 questions' : 'Limited · 3 questions only'}</span>
+          <span>
+            {weakSubtopic
+              ? \`Focus: \${weakSubtopic.subtopic} · \${access.hasFullAccess ? '5 questions' : '3 questions'}\`
+              : access.hasFullAccess ? 'Start practising · 5 questions' : 'Limited · 3 questions only'
+            }
+          </span>
           <span style={{ fontSize: 18 }}>→</span>
         </div>
       </div>
