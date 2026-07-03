@@ -14,7 +14,7 @@ export default function SubscribePage() {
   // Placeholder — replace with your actual merchant details
   const MERCHANT_NUMBER = 'XXXXXXXXXX'
   const MERCHANT_NAME = 'Distinction PLE Tutor'
-  const AMOUNT = 'UGX 25,000'
+  const AMOUNT = 'UGX 8,000'
 
   useEffect(() => { loadProfile() }, [])
 
@@ -112,7 +112,7 @@ export default function SubscribePage() {
         {/* Price */}
         <div style={{ background: '#534AB7', borderRadius: 12, padding: 20, marginBottom: 20, color: '#fff', textAlign: 'center' }}>
           <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 6 }}>Premium subscription</div>
-          <div style={{ fontSize: 40, fontWeight: 700, marginBottom: 4 }}>UGX 25,000</div>
+          <div style={{ fontSize: 40, fontWeight: 700, marginBottom: 4 }}>UGX 8,000</div>
           <div style={{ fontSize: 14, opacity: 0.8 }}>per month · cancel any time</div>
         </div>
 
@@ -218,3 +218,4 @@ export default function SubscribePage() {
     </div>
   )
 }
+
