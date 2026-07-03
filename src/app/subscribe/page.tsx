@@ -132,7 +132,7 @@ export default function SubscribePage() {
               'Select 1 — Transfer money',
               'Select 4 — Send to code',
               `Enter merchant code: ${MERCHANT_NUMBER}`,
-              `Enter amount: 25000`,
+              `Enter amount: 8000`,
               'Enter your PIN to confirm',
             ].map((step, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
@@ -154,7 +154,7 @@ export default function SubscribePage() {
               'Select 1 — Make payment',
               'Select 3 — Pay merchant',
               `Enter merchant code: ${MERCHANT_NUMBER}`,
-              `Enter amount: 25000`,
+              `Enter amount: 8000`,
               'Enter your PIN to confirm',
             ].map((step, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
