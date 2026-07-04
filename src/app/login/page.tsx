@@ -60,11 +60,14 @@ export default function LoginPage() {
       }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🎓</div>
         <div style={{ fontSize: 22, fontWeight: 500, marginBottom: 4 }}>
-          Distinction PLE Tutor
+          Get Ready 4 PLE
         </div>
         <div style={{ fontSize: 14, opacity: 0.8 }}>
-          P7 exam preparation for Uganda
+          Smart AI tutoring and exam revision for PLE preparation
         </div>
+        <a href="/" style={{ display: 'inline-block', marginTop: 12, fontSize: 12, color: 'rgba(255,255,255,0.7)', textDecoration: 'none' }}>
+          ← Back to home
+        </a>
       </div>
 
       {/* Form */}
