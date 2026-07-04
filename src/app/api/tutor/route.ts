@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const DAILY_LIMIT_FREE = 0      // no AI tutor on free/expired plan
-const DAILY_LIMIT_TRIAL = 20    // 20 per day during trial
-const DAILY_LIMIT_PREMIUM = 50  // 50 per day for subscribers
+const DAILY_LIMIT_FREE = 0        // no AI tutor on free/expired plan
+const DAILY_LIMIT_TRIAL = 20      // 20 interactions/day during trial
+const DAILY_LIMIT_PREMIUM = 50    // 50 interactions/day for subscribers
+const DAILY_IMAGE_LIMIT = 10      // max image uploads per day for all plans
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please sign in to use the AI Tutor.' }, { status: 401 })
     }
 
-    // Get profile — check subscription and trial status
+    // Get profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('is_subscribed, trial_started_at, subscription_expires_at')
@@ -52,38 +53,40 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date()
+    const today = now.toISOString().split('T')[0]
     const trialStart = profile.trial_started_at ? new Date(profile.trial_started_at) : null
     const trialActive = trialStart ? (now.getTime() - trialStart.getTime()) < 24 * 60 * 60 * 1000 : false
     const subscriptionActive = profile.is_subscribed &&
       (!profile.subscription_expires_at || new Date(profile.subscription_expires_at) > now)
 
-    // Determine daily limit
+    // Determine daily interaction limit
     let dailyLimit: number
     if (subscriptionActive) {
       dailyLimit = DAILY_LIMIT_PREMIUM
     } else if (trialActive) {
       dailyLimit = DAILY_LIMIT_TRIAL
     } else {
-      // Trial expired, not subscribed
       return NextResponse.json({
         error: 'Your free trial has ended. Please subscribe to continue using the AI Tutor.',
         requiresSubscription: true,
       }, { status: 403 })
     }
 
-    // Get student to check daily count
+    // Get student interaction counts
     const { data: student } = await supabase
       .from('students')
-      .select('id, ai_interactions_today, ai_interactions_date')
+      .select('id, ai_interactions_today, ai_interactions_date, ai_images_today, ai_images_date')
       .eq('parent_id', user.id)
       .limit(1)
       .single()
 
     if (student) {
-      const today = now.toISOString().split('T')[0]
       const lastDate = student.ai_interactions_date
       const todayCount = lastDate === today ? (student.ai_interactions_today || 0) : 0
+      const lastImageDate = student.ai_images_date
+      const todayImageCount = lastImageDate === today ? (student.ai_images_today || 0) : 0
 
+      // Check overall interaction limit
       if (todayCount >= dailyLimit) {
         return NextResponse.json({
           error: `You have used all ${dailyLimit} AI Tutor interactions for today. Come back tomorrow — your limit resets at midnight! 🌙`,
@@ -91,14 +94,26 @@ export async function POST(request: NextRequest) {
         }, { status: 429 })
       }
 
-      // Increment counter
-      await supabase
-        .from('students')
-        .update({
-          ai_interactions_today: todayCount + 1,
-          ai_interactions_date: today,
-        })
-        .eq('id', student.id)
+      // Check image upload limit separately
+      if (imageBase64 && todayImageCount >= DAILY_IMAGE_LIMIT) {
+        return NextResponse.json({
+          error: `You have reached the limit of ${DAILY_IMAGE_LIMIT} image uploads for today. You can still ask text questions — image uploads reset at midnight! 🌙`,
+          imageLimitReached: true,
+        }, { status: 429 })
+      }
+
+      // Update counters
+      const updates: Record<string, unknown> = {
+        ai_interactions_today: todayCount + 1,
+        ai_interactions_date: today,
+      }
+
+      if (imageBase64) {
+        updates.ai_images_today = todayImageCount + 1
+        updates.ai_images_date = today
+      }
+
+      await supabase.from('students').update(updates).eq('id', student.id)
     }
 
     // ── BUILD PROMPT ─────────────────────────────────────────
