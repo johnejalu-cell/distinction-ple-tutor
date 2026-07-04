@@ -142,7 +142,7 @@ export default function DashboardPage() {
 
   async function handleSignOut() {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/')
   }
 
   function getMastery(code: string) {
@@ -379,7 +379,7 @@ export default function DashboardPage() {
       {/* About link */}
       <div style={{ textAlign: 'center', padding: '12px 16px 4px' }}>
         <a href="/" style={{ fontSize: 12, color: '#888780', textDecoration: 'none' }}>
-          🎓 About Get Ready 4 PLE
+          🏠 Home — getready4ple.online
         </a>
       </div>
 
