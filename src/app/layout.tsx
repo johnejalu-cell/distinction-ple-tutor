@@ -7,8 +7,12 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Get Ready 4 PLE',
+  },
+  icons: {
+    icon: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
   },
 }
 
@@ -16,7 +20,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#534AB7',
+  themeColor: '#1E1B4B',
 }
 
 export default function RootLayout({
@@ -26,10 +30,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" href="/icon-192.png" />
+      </head>
       <body>
         {children}
       </body>
     </html>
   )
 }
-
