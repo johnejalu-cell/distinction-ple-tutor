@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import InstallPrompt from '@/components/InstallPrompt'
 
 export const metadata: Metadata = {
   title: 'Get Ready 4 PLE',
@@ -36,6 +37,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        <InstallPrompt />
       </body>
     </html>
   )
