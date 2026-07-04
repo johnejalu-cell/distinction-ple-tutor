@@ -268,7 +268,7 @@ export default function DashboardPage() {
 
       {/* Today's challenge */}
       <div className="section-label">Today&apos;s Challenge</div>
-      <div onClick={() => router.push(\`/session?subject=\${weakSubtopic ? weakSubtopic.subjectCode : 'mathematics'}\`)}
+      <div onClick={() => router.push(`/session?subject=${weakSubtopic ? weakSubtopic.subjectCode : 'mathematics'}`)}
         style={{ margin: '0 16px 8px', background: '#E1F5EE', border: '0.5px solid rgba(29,158,117,0.25)', borderRadius: 12, padding: 16, cursor: 'pointer' }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5 }}>⚡ Daily Challenge</div>
         <div style={{ fontSize: 16, fontWeight: 500, color: '#0F6E56', marginBottom: 3 }}>
@@ -277,7 +277,7 @@ export default function DashboardPage() {
         <div style={{ fontSize: 13, color: '#1D9E75', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>
             {weakSubtopic
-              ? \`Focus: \${weakSubtopic.subtopic} · \${access.hasFullAccess ? '5 questions' : '3 questions'}\`
+              ? `Focus: ${weakSubtopic.subtopic} · ${access.hasFullAccess ? '5 questions' : '3 questions'}`
               : access.hasFullAccess ? 'Start practising · 5 questions' : 'Limited · 3 questions only'
             }
           </span>
