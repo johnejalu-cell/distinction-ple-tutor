@@ -37,16 +37,15 @@ export default function LandingPage() {
               <div style={{ fontSize: 16, fontWeight: 800, color: '#F59E0B', lineHeight: 1.1 }}>4 PLE</div>
             </div>
           </Link>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <Link href="/dashboard" className="lp-nav-link">Dashboard</Link>
-            <Link href="/login" className="lp-nav-link">Sign in</Link>
             <Link href="/login" style={{
               fontSize: 14, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap',
               background: 'linear-gradient(135deg, #534AB7, #7C3AED)',
               padding: '9px 20px', borderRadius: 25, textDecoration: 'none',
               boxShadow: '0 4px 15px rgba(83,74,183,0.4)',
             }}>
-              Start free →
+              Sign in / Start free →
             </Link>
           </div>
         </div>
@@ -95,7 +94,7 @@ export default function LandingPage() {
               borderRadius: 14, textDecoration: 'none',
               border: '1px solid rgba(255,255,255,0.3)',
             }}>
-              See how it works
+              See how it works & pricing
             </a>
           </div>
           <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 60 }}>No credit card needed · Cancel any time</p>
@@ -397,4 +396,3 @@ export default function LandingPage() {
     </div>
   )
 }
-
