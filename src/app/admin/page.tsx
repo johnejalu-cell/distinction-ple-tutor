@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 
 interface Submission {
   id: string
+  user_id: string
   full_name: string
   email: string
   transaction_id: string
@@ -52,14 +53,7 @@ export default function AdminPage() {
   async function activateAccount(submission: Submission) {
     setActivating(submission.id)
     try {
-      // 1. Get the user's profile ID from their email
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', submission.user_id ?? '')
-        .limit(1)
-
-      // 2. Activate their subscription
+      // Activate their subscription using user_id from submission
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -67,7 +61,7 @@ export default function AdminPage() {
           subscribed_at: new Date().toISOString(),
           subscription_expires_at: null,
         })
-        .eq('id', submission.user_id ?? (users?.[0]?.id ?? ''))
+        .eq('id', submission.user_id)
 
       if (error) throw error
 
