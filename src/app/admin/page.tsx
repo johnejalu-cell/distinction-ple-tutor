@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [activating, setActivating] = useState<string | null>(null)
   const [unauthorized, setUnauthorized] = useState(false)
   const [filter, setFilter] = useState<'all' | 'pending' | 'activated'>('pending')
+  const [refreshKey, setRefreshKey] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
@@ -48,6 +49,7 @@ export default function AdminPage() {
       .select('*')
       .order('submitted_at', { ascending: false })
     setSubmissions(data || [])
+    setRefreshKey(k => k + 1)
   }
 
   async function activateAccount(submission: Submission) {
