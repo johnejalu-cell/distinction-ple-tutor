@@ -18,7 +18,7 @@ interface Submission {
 }
 
 // Your admin email — only this email can access this page
-const ADMIN_EMAIL = 'john.ejalu@gmail.com'
+const ADMIN_EMAIL = 'johnoejalu@yahoo.com'
 
 export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
