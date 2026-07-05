@@ -134,11 +134,11 @@ export default function SubscribePage() {
             {(['MTN', 'Airtel'] as const).map(n => (
               <button key={n} onClick={() => setNetwork(n)}
                 style={{
-                  flex: 1, padding: '10px', border: 'none', borderRadius: 10, cursor: 'pointer',
+                  flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
                   fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
                   background: network === n ? (n === 'MTN' ? '#FAEEDA' : '#FAECE7') : '#F1EFE8',
                   color: network === n ? (n === 'MTN' ? '#854F0B' : '#993C1D') : '#888780',
-                  border: network === n ? `2px solid ${n === 'MTN' ? '#BA7517' : '#D85A30'}` : '2px solid transparent',
+                  border: network === n ? (n === 'MTN' ? '2px solid #BA7517' : '2px solid #D85A30') : '2px solid transparent',
                 }}>
                 {n === 'MTN' ? '🟡 MTN MoMo' : '🔴 Airtel Money'}
               </button>
