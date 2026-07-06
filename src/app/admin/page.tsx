@@ -25,7 +25,6 @@ export default function AdminPage() {
   const [counts, setCounts] = useState({ total: 0, pending: 0, activated: 0 })
   const [loading, setLoading] = useState(true)
   const [activating, setActivating] = useState<string | null>(null)
-  const [unauthorized, setUnauthorized] = useState(false)
   const [filter, setFilter] = useState<'all' | 'pending' | 'activated'>('pending')
   const [refreshKey, setRefreshKey] = useState(0)
   const router = useRouter()
@@ -36,8 +35,7 @@ export default function AdminPage() {
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || user.email !== ADMIN_EMAIL) {
-      setUnauthorized(true)
-      setLoading(false)
+      router.push('/dashboard')
       return
     }
     await fetchSubmissions()
@@ -121,19 +119,7 @@ export default function AdminPage() {
     )
   }
 
-  if (unauthorized) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column', gap: 16, padding: 24 }}>
-        <div style={{ fontSize: 40 }}>🔒</div>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Access denied</div>
-        <div style={{ fontSize: 14, color: '#888780', textAlign: 'center' }}>This page is only accessible to administrators.</div>
-        <button onClick={() => router.push('/dashboard')}
-          style={{ padding: '10px 20px', background: '#534AB7', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>
-          Back to dashboard
-        </button>
-      </div>
-    )
-  }
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#F8F9FF' }}>
