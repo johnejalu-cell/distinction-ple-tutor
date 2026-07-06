@@ -17,6 +17,11 @@ export default function OnboardingPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
   async function handleCreate() {
     if (!fullName.trim()) {
       setError('Please enter your child\'s name')
@@ -53,8 +58,12 @@ export default function OnboardingPage() {
       {/* Header */}
       <div style={{
         background: '#534AB7', padding: '32px 24px 28px',
-        color: '#fff', textAlign: 'center',
+        color: '#fff', textAlign: 'center', position: 'relative',
       }}>
+        <button onClick={handleSignOut}
+          style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Sign out
+        </button>
         <div style={{ fontSize: 40, marginBottom: 10 }}>👨‍👩‍👧</div>
         <div style={{ fontSize: 20, fontWeight: 500, marginBottom: 6 }}>Add your child</div>
         <div style={{ fontSize: 13, opacity: 0.8 }}>
