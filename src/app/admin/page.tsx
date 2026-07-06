@@ -22,6 +22,7 @@ const ADMIN_EMAIL = 'johnoejalu@yahoo.com'
 
 export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [counts, setCounts] = useState({ total: 0, pending: 0, activated: 0 })
   const [loading, setLoading] = useState(true)
   const [activating, setActivating] = useState<string | null>(null)
   const [unauthorized, setUnauthorized] = useState(false)
@@ -43,12 +44,23 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
   async function fetchSubmissions() {
     const { data } = await supabase
       .from('payment_submissions')
       .select('*')
       .order('submitted_at', { ascending: false })
-    setSubmissions(data || [])
+    const rows = data || []
+    setSubmissions(rows)
+    setCounts({
+      total: rows.length,
+      pending: rows.filter(r => r.status === 'pending').length,
+      activated: rows.filter(r => r.status === 'activated').length,
+    })
     setRefreshKey(k => k + 1)
   }
 
@@ -132,14 +144,18 @@ export default function AdminPage() {
             <div style={{ fontSize: 18, fontWeight: 700 }}>⚙️ Admin Panel</div>
             <div style={{ fontSize: 12, opacity: 0.7 }}>Get Ready 4 PLE — Payment Activations</div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={fetchSubmissions}
               style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
               🔄 Refresh
             </button>
             <button onClick={() => router.push('/dashboard')}
               style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
-              ← Dashboard
+              🏠 Dashboard
+            </button>
+            <button onClick={handleSignOut}
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Sign out
             </button>
           </div>
         </div>
@@ -147,9 +163,9 @@ export default function AdminPage() {
         {/* Stats */}
         <div key={refreshKey} style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginTop: 16 }}>
           {[
-            { label: 'Total', value: submissions.length, color: '#fff' },
-            { label: 'Pending', value: pendingCount, color: '#F59E0B' },
-            { label: 'Activated', value: submissions.filter(s => s.status === 'activated').length, color: '#34D399' },
+            { label: 'Total', value: counts.total, color: '#fff' },
+            { label: 'Pending', value: counts.pending, color: '#F59E0B' },
+            { label: 'Activated', value: counts.activated, color: '#34D399' },
           ].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px', textAlign: 'center' }}>
               <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -170,7 +186,7 @@ export default function AdminPage() {
                 background: filter === f ? '#534AB7' : '#F1EFE8',
                 color: filter === f ? '#fff' : '#888780',
               }}>
-              {f} {f === 'pending' && pendingCount > 0 ? `(${pendingCount})` : ''}
+              {f} {f === 'pending' && counts.pending > 0 ? `(${counts.pending})` : ''}
             </button>
           ))}
         </div>
