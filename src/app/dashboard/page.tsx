@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const [daysToExam, setDaysToExam] = useState(0)
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [weakSubtopic, setWeakSubtopic] = useState<{ subject: string; subjectCode: string; subtopic: string } | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [access, setAccess] = useState<AccessStatus>({
     hasFullAccess: true,
     isTrial: true,
@@ -55,6 +56,7 @@ export default function DashboardPage() {
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+    if (user.email === 'johnoejalu@yahoo.com') setIsAdmin(true)
 
     // Check access status
     const { data: profile } = await supabase
@@ -377,10 +379,15 @@ export default function DashboardPage() {
       <div style={{ flex: 1 }} />
 
       {/* About link */}
-      <div style={{ textAlign: 'center', padding: '12px 16px 4px' }}>
+      <div style={{ textAlign: 'center', padding: '12px 16px 4px', display: 'flex', justifyContent: 'center', gap: 20 }}>
         <a href="/" style={{ fontSize: 12, color: '#888780', textDecoration: 'none' }}>
-          🏠 Home — getready4ple.online
+          🏠 Home
         </a>
+        {isAdmin && (
+          <a href="/admin" style={{ fontSize: 12, color: '#534AB7', textDecoration: 'none', fontWeight: 500 }}>
+            ⚙️ Admin Panel
+          </a>
+        )}
       </div>
 
       {/* Bottom nav */}
@@ -404,3 +411,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+
