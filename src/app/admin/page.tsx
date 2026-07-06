@@ -66,7 +66,7 @@ export default function AdminPage() {
     setActivating(submission.id)
     try {
       // Activate their subscription using user_id from submission
-      const { error } = await supabase
+      const { data: profileRows, error: profileError } = await supabase
         .from('profiles')
         .update({
           is_subscribed: true,
@@ -74,18 +74,32 @@ export default function AdminPage() {
           subscription_expires_at: null,
         })
         .eq('id', submission.user_id)
+        .select()
 
-      if (error) throw error
+      if (profileError) throw new Error(`Profile update failed: ${profileError.message}`)
+      if (!profileRows || profileRows.length === 0) {
+        throw new Error(
+          'Profile update matched 0 rows. This almost always means a Row Level Security policy on the "profiles" table is blocking admin updates to other users\' rows. Check Supabase → Authentication → Policies → profiles → UPDATE policy.'
+        )
+      }
 
-      // 3. Mark submission as activated
-      await supabase
+      // Mark submission as activated
+      const { data: subRows, error: subError } = await supabase
         .from('payment_submissions')
         .update({ status: 'activated', activated_at: new Date().toISOString() })
         .eq('id', submission.id)
+        .select()
+
+      if (subError) throw new Error(`Submission update failed: ${subError.message}`)
+      if (!subRows || subRows.length === 0) {
+        throw new Error(
+          'Submission status update matched 0 rows. This almost always means a Row Level Security policy on the "payment_submissions" table is blocking admin updates. Check Supabase → Authentication → Policies → payment_submissions → UPDATE policy.'
+        )
+      }
 
       await fetchSubmissions()
-    } catch (err) {
-      alert('Error activating account. Check console.')
+    } catch (err: any) {
+      alert(err?.message || 'Error activating account. Check console.')
       console.error(err)
     } finally {
       setActivating(null)
