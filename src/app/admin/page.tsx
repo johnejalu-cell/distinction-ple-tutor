@@ -132,14 +132,20 @@ export default function AdminPage() {
             <div style={{ fontSize: 18, fontWeight: 700 }}>⚙️ Admin Panel</div>
             <div style={{ fontSize: 12, opacity: 0.7 }}>Get Ready 4 PLE — Payment Activations</div>
           </div>
-          <button onClick={() => router.push('/dashboard')}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
-            ← Dashboard
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={fetchSubmissions}
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
+              🔄 Refresh
+            </button>
+            <button onClick={() => router.push('/dashboard')}
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 12, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>
+              ← Dashboard
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginTop: 16 }}>
+        <div key={refreshKey} style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginTop: 16 }}>
           {[
             { label: 'Total', value: submissions.length, color: '#fff' },
             { label: 'Pending', value: pendingCount, color: '#F59E0B' },
