@@ -27,6 +27,9 @@ export default function AdminPage() {
   const [activating, setActivating] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'activated'>('pending')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'reject' | 'cancel' | null>(null)
+  const [processing, setProcessing] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -106,12 +109,58 @@ export default function AdminPage() {
     }
   }
 
+  function requestConfirm(id: string, action: 'reject' | 'cancel') {
+    setConfirmingId(id)
+    setConfirmAction(action)
+  }
+
+  function cancelConfirm() {
+    setConfirmingId(null)
+    setConfirmAction(null)
+  }
+
   async function rejectSubmission(id: string) {
-    await supabase
-      .from('payment_submissions')
-      .update({ status: 'rejected' })
-      .eq('id', id)
-    await fetchSubmissions()
+    setProcessing(id)
+    try {
+      await supabase
+        .from('payment_submissions')
+        .update({ status: 'rejected' })
+        .eq('id', id)
+      await fetchSubmissions()
+    } finally {
+      setProcessing(null)
+      cancelConfirm()
+    }
+  }
+
+  async function cancelSubscription(submission: Submission) {
+    setProcessing(submission.id)
+    try {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          is_subscribed: false,
+          subscription_expires_at: new Date().toISOString(),
+        })
+        .eq('id', submission.user_id)
+
+      if (profileError) throw new Error(`Profile update failed: ${profileError.message}`)
+
+      const { error: subError } = await supabase
+        .from('payment_submissions')
+        .update({ status: 'cancelled' })
+        .eq('id', submission.id)
+
+      if (subError) throw new Error(`Submission update failed: ${subError.message}`)
+
+      await fetchSubmissions()
+    } catch (err: any) {
+      alert(err?.message || 'Error cancelling subscription. Check console.')
+      console.error(err)
+    } finally {
+      setProcessing(null)
+      cancelConfirm()
+    }
   }
 
   function formatDate(iso: string) {
@@ -202,7 +251,7 @@ export default function AdminPage() {
             {filtered.map(s => (
               <div key={s.id} style={{
                 background: '#fff', borderRadius: 12, padding: 16,
-                border: `1.5px solid ${s.status === 'pending' ? 'rgba(245,158,11,0.4)' : s.status === 'activated' ? 'rgba(52,211,153,0.4)' : 'rgba(0,0,0,0.08)'}`,
+                border: `1.5px solid ${s.status === 'pending' ? 'rgba(245,158,11,0.4)' : s.status === 'activated' ? 'rgba(52,211,153,0.4)' : s.status === 'cancelled' ? 'rgba(186,117,23,0.4)' : 'rgba(0,0,0,0.08)'}`,
               }}>
                 {/* Status badge */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -212,8 +261,8 @@ export default function AdminPage() {
                   </div>
                   <span style={{
                     fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                    background: s.status === 'pending' ? '#FAEEDA' : s.status === 'activated' ? '#E1F5EE' : '#FCEBEB',
-                    color: s.status === 'pending' ? '#854F0B' : s.status === 'activated' ? '#0F6E56' : '#A32D2D',
+                    background: s.status === 'pending' ? '#FAEEDA' : s.status === 'activated' ? '#E1F5EE' : s.status === 'cancelled' ? '#FAEEDA' : '#FCEBEB',
+                    color: s.status === 'pending' ? '#854F0B' : s.status === 'activated' ? '#0F6E56' : s.status === 'cancelled' ? '#854F0B' : '#A32D2D',
                     textTransform: 'uppercase',
                   }}>
                     {s.status}
@@ -247,7 +296,28 @@ export default function AdminPage() {
                 </div>
 
                 {/* Action buttons */}
-                {s.status === 'pending' && (
+                {s.status === 'pending' && confirmingId === s.id && confirmAction === 'reject' && (
+                  <div>
+                    <div style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, textAlign: 'center', marginBottom: 8 }}>
+                      Reject this submission? This can't be undone.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={cancelConfirm}
+                        style={{ flex: 1, padding: '11px', border: '1.5px solid rgba(0,0,0,0.15)', borderRadius: 10, background: 'transparent', color: '#1a1a2e', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Keep Pending
+                      </button>
+                      <button
+                        onClick={() => rejectSubmission(s.id)}
+                        disabled={processing === s.id}
+                        style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: '#A32D2D', color: '#fff', fontSize: 14, fontWeight: 600, cursor: processing === s.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                        {processing === s.id ? 'Rejecting...' : 'Confirm Reject'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {s.status === 'pending' && !(confirmingId === s.id && confirmAction === 'reject') && (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => activateAccount(s)}
@@ -262,16 +332,56 @@ export default function AdminPage() {
                       {activating === s.id ? '⏳ Activating...' : '✅ Activate Account'}
                     </button>
                     <button
-                      onClick={() => rejectSubmission(s.id)}
+                      onClick={() => requestConfirm(s.id, 'reject')}
                       style={{ flex: 1, padding: '11px', border: '1.5px solid #A32D2D', borderRadius: 10, background: 'transparent', color: '#A32D2D', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                       ❌ Reject
                     </button>
                   </div>
                 )}
 
-                {s.status === 'activated' && (
-                  <div style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500, textAlign: 'center', padding: '8px 0' }}>
-                    ✅ Account is active
+                {s.status === 'activated' && confirmingId === s.id && confirmAction === 'cancel' && (
+                  <div>
+                    <div style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, textAlign: 'center', marginBottom: 8 }}>
+                      Cancel this subscription? Access will be revoked immediately.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={cancelConfirm}
+                        style={{ flex: 1, padding: '11px', border: '1.5px solid rgba(0,0,0,0.15)', borderRadius: 10, background: 'transparent', color: '#1a1a2e', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Keep Active
+                      </button>
+                      <button
+                        onClick={() => cancelSubscription(s)}
+                        disabled={processing === s.id}
+                        style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, background: '#A32D2D', color: '#fff', fontSize: 14, fontWeight: 600, cursor: processing === s.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                        {processing === s.id ? 'Cancelling...' : 'Confirm Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {s.status === 'activated' && !(confirmingId === s.id && confirmAction === 'cancel') && (
+                  <div>
+                    <div style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500, textAlign: 'center', padding: '8px 0 10px' }}>
+                      ✅ Account is active
+                    </div>
+                    <button
+                      onClick={() => requestConfirm(s.id, 'cancel')}
+                      style={{ width: '100%', padding: '9px', border: '1.5px solid #A32D2D', borderRadius: 10, background: 'transparent', color: '#A32D2D', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Cancel Subscription
+                    </button>
+                  </div>
+                )}
+
+                {s.status === 'cancelled' && (
+                  <div style={{ fontSize: 13, color: '#854F0B', fontWeight: 500, textAlign: 'center', padding: '8px 0' }}>
+                    🚫 Subscription cancelled
+                  </div>
+                )}
+
+                {s.status === 'rejected' && (
+                  <div style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, textAlign: 'center', padding: '8px 0' }}>
+                    ❌ Rejected
                   </div>
                 )}
               </div>
@@ -282,3 +392,4 @@ export default function AdminPage() {
     </div>
   )
 }
+
