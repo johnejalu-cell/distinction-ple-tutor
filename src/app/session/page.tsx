@@ -23,6 +23,50 @@ interface WeakSubtopic {
   mastery_pct: number
 }
 
+// ── PLE MARK-WEIGHTING ──────────────────────────────────────────
+// Approximate relative weight (out of 100) each topic carries on the
+// actual PLE paper, based on typical UNEB emphasis. These are estimates,
+// not official UNEB-published figures — adjust the numbers below if you
+// have actual past-paper mark tallies. Topics not listed fall back to
+// an even default weight. Names must match `topics.name` exactly.
+const TOPIC_WEIGHTS: Record<string, Record<string, number>> = {
+  mathematics: {
+    'Word Problems': 25,
+    'Fractions & Decimals': 18,
+    'Percentages': 15,
+    'Money & Financial Maths': 15,
+    'Ratio & Proportion': 12,
+    'Geometry — Area/Perimeter': 10,
+    'LCM, HCF & Factors': 5,
+  },
+  english: {
+    'Reading Comprehension': 30,
+    'Tenses': 20,
+    'Parts of Speech': 20,
+    'Vocabulary': 18,
+    'Punctuation & Spelling': 12,
+  },
+  science: {
+    'Human Body Systems': 20,
+    'Living Things': 18,
+    'Health & Nutrition': 17,
+    'Environment & Ecology': 15,
+    'Food Chains & Webs': 15,
+    'States of Matter': 15,
+  },
+}
+const DEFAULT_TOPIC_WEIGHT = 10
+
+// Fisher-Yates shuffle — unbiased, unlike Array.sort(() => Math.random() - 0.5)
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 // Compress image before sending
 async function compressImage(file: File, maxWidth = 800, quality = 0.6): Promise<{ base64: string; type: string }> {
   return new Promise((resolve, reject) => {
@@ -125,13 +169,112 @@ function SessionContent() {
     if (!subject) { router.push('/dashboard'); return }
     setSubjectName(subject.name)
 
-    const { data: subtopics } = await supabase
+    // Fetch subtopics WITH their topic name, so we can weight selection
+    // by real PLE mark distribution instead of treating every subtopic equally.
+    const { data: subtopicRows } = await supabase
       .from('subtopics')
-      .select('id, topics!inner(subject_id)')
+      .select('id, topics!inner(name, subject_id)')
       .eq('topics.subject_id', subject.id)
 
-    if (!subtopics?.length) { router.push('/dashboard'); return }
-    const allSubtopicIds = subtopics.map(s => s.id)
+    if (!subtopicRows?.length) { router.push('/dashboard'); return }
+
+    type SubtopicRow = {
+      id: string
+      topics: { name: string; subject_id: string } | { name: string; subject_id: string }[]
+    }
+    const topicToSubtopics: Record<string, string[]> = {}
+    for (const row of subtopicRows as SubtopicRow[]) {
+      const topic = Array.isArray(row.topics) ? row.topics[0] : row.topics
+      const topicName = topic?.name || 'Unknown'
+      if (!topicToSubtopics[topicName]) topicToSubtopics[topicName] = []
+      topicToSubtopics[topicName].push(row.id)
+    }
+    const allSubtopicIds = subtopicRows.map(s => s.id)
+
+    const weights = TOPIC_WEIGHTS[subjectCode] || {}
+    const topicWeightList = Object.keys(topicToSubtopics).map(name => ({
+      name,
+      weight: weights[name] ?? DEFAULT_TOPIC_WEIGHT,
+    }))
+
+    // Recently-answered question IDs for this student, so we avoid
+    // repeating the same questions session after session. We prefer
+    // unseen questions but fall back to recently-seen ones if a pool
+    // is too small to fill a session without repeats.
+    const { data: recentResponses } = await supabase
+      .from('session_responses')
+      .select('question_id')
+      .eq('student_id', sid)
+      .order('created_at', { ascending: false })
+      .limit(60)
+    const recentlySeenIds = new Set((recentResponses || []).map(r => r.question_id))
+
+    // Fetch the FULL active question pool for this subject — no low
+    // artificial limit. Fetching 20 rows with no ORDER BY was the bug
+    // causing the same fixed set of questions to appear repeatedly:
+    // Postgres returns unordered results in a consistent sequence, so
+    // every session was drawing from the same ~20 rows and just
+    // reshuffling their order client-side.
+    const { data: allSubjectQs } = await supabase
+      .from('questions')
+      .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
+      .in('subtopic_id', allSubtopicIds)
+      .eq('is_active', true)
+      .limit(1000)
+
+    const questionPool = (allSubjectQs || []) as Question[]
+    if (!questionPool.length) { router.push('/dashboard'); return }
+
+    // Prefer unseen questions from a pool; only include recently-seen
+    // ones if there aren't enough fresh ones to fill `count`.
+    function pickFresh(pool: Question[], count: number): Question[] {
+      const fresh = shuffle(pool.filter(q => !recentlySeenIds.has(q.id)))
+      const stale = shuffle(pool.filter(q => recentlySeenIds.has(q.id)))
+      return [...fresh, ...stale].slice(0, count)
+    }
+
+    // Weighted stratified sampling: pick a topic according to its PLE
+    // weight, then a random subtopic within it, then a random unused
+    // question within that — preferring unseen questions throughout.
+    // Repeated across a session, this makes the overall mix of topics
+    // track real exam mark distribution instead of uniform-per-subtopic.
+    function pickWeighted(pool: Question[], count: number): Question[] {
+      const bySubtopic: Record<string, Question[]> = {}
+      for (const q of pool) {
+        (bySubtopic[q.subtopic_id] ||= []).push(q)
+      }
+      const usedIds = new Set<string>()
+      const fresh: Question[] = []
+      const stale: Question[] = []
+      const totalW = topicWeightList.reduce((s, t) => s + t.weight, 0) || 1
+      let guard = 0
+      while (fresh.length + stale.length < count && guard < count * 60) {
+        guard++
+        let r = Math.random() * totalW
+        let chosenTopic = topicWeightList[0]?.name
+        for (const t of topicWeightList) {
+          r -= t.weight
+          if (r <= 0) { chosenTopic = t.name; break }
+        }
+        const subIds = (topicToSubtopics[chosenTopic] || [])
+          .filter(id => (bySubtopic[id] || []).some(q => !usedIds.has(q.id)))
+        if (!subIds.length) {
+          // This topic is exhausted for this session — if every topic is
+          // exhausted, stop; otherwise just try again with another pick.
+          const anyLeft = topicWeightList.some(t =>
+            (topicToSubtopics[t.name] || []).some(id => (bySubtopic[id] || []).some(q => !usedIds.has(q.id)))
+          )
+          if (!anyLeft) break
+          continue
+        }
+        const subId = subIds[Math.floor(Math.random() * subIds.length)]
+        const candidates = (bySubtopic[subId] || []).filter(q => !usedIds.has(q.id))
+        const pick = candidates[Math.floor(Math.random() * candidates.length)]
+        usedIds.add(pick.id)
+        if (recentlySeenIds.has(pick.id)) stale.push(pick); else fresh.push(pick)
+      }
+      return shuffle([...fresh, ...stale]).slice(0, count)
+    }
 
     // ── ADAPTIVE SELECTION ──────────────────────────────────────
     const { data: weakProgress } = await supabase
@@ -163,37 +306,21 @@ function SessionContent() {
       const knownIds = [...weakIds, ...mediumIds]
       const strongIds = allSubtopicIds.filter(id => !knownIds.includes(id))
 
-      const [weakRes, mediumRes, strongRes] = await Promise.all([
-        supabase.from('questions')
-          .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-          .in('subtopic_id', weakIds).eq('is_active', true).limit(10),
-        mediumIds.length > 0
-          ? supabase.from('questions')
-              .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-              .in('subtopic_id', mediumIds).eq('is_active', true).limit(6)
-          : Promise.resolve({ data: [] }),
-        strongIds.length > 0
-          ? supabase.from('questions')
-              .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-              .in('subtopic_id', strongIds).eq('is_active', true).limit(6)
-          : Promise.resolve({ data: [] }),
-      ])
+      const weakPool = questionPool.filter(q => weakIds.includes(q.subtopic_id))
+      const mediumPool = questionPool.filter(q => mediumIds.includes(q.subtopic_id))
+      const strongPool = questionPool.filter(q => strongIds.includes(q.subtopic_id))
 
-      const weakQs = (weakRes.data || []).sort(() => Math.random() - 0.5).slice(0, 3)
-      const mediumQs = (mediumRes.data || []).sort(() => Math.random() - 0.5).slice(0, 1)
-      const strongQs = (strongRes.data || []).sort(() => Math.random() - 0.5).slice(0, 1)
+      const weakQs = pickFresh(weakPool, 3)
+      const mediumQs = pickFresh(mediumPool, 1)
+      const strongQs = pickFresh(strongPool, 1)
       const combined = [...weakQs, ...mediumQs, ...strongQs]
-      if (combined.length >= 3) selectedQuestions = combined.sort(() => Math.random() - 0.5)
+      if (combined.length >= 3) selectedQuestions = shuffle(combined)
     }
 
     if (selectedQuestions.length < 3) {
       setIsAdaptive(false)
-      const { data: allQs } = await supabase
-        .from('questions')
-        .select('id, stem, question_type, difficulty, options, correct_answer, explanation, scaffold, hint_level_1, hint_level_2, subtopic_id')
-        .in('subtopic_id', allSubtopicIds).eq('is_active', true).limit(20)
-      if (!allQs?.length) { router.push('/dashboard'); return }
-      selectedQuestions = allQs.sort(() => Math.random() - 0.5)
+      selectedQuestions = pickWeighted(questionPool, Math.max(limit, 5))
+      if (!selectedQuestions.length) { router.push('/dashboard'); return }
     }
 
     // Apply question limit (3 for free, 5 for full access)
