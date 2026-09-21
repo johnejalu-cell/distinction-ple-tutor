@@ -102,7 +102,7 @@ export default function LandingPage() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, maxWidth: 700, margin: '0 auto' }}>
             {[
-              { value: '300+', label: 'PLE questions' },
+              { value: '800+', label: 'PLE questions' },
               { value: '3', label: 'Subjects covered' },
               { value: 'AI', label: 'Powered tutor' },
               { value: '24/7', label: 'Always available' },
@@ -214,9 +214,9 @@ export default function LandingPage() {
           </div>
           <div className="lp-subjects-grid">
             {[
-              { icon: '🔢', name: 'Mathematics', color: '#D97706', bg: '#FFFBEB', border: '#FCD34D', topics: ['Fractions & Decimals', 'Ratio & Proportion', 'Percentages', 'LCM & HCF', 'Geometry & Area', 'Money & Finance', 'Word Problems', 'Statistics & Data', 'Algebra Basics', 'Long Division', 'Time & Speed', 'Measurement'] },
-              { icon: '📖', name: 'English Language', color: '#059669', bg: '#ECFDF5', border: '#6EE7B7', topics: ['Grammar & Tenses', 'Parts of Speech', 'Vocabulary & Idioms', 'Reading Comprehension', 'Punctuation & Spelling', 'Direct & Indirect Speech', 'Sentence Construction', 'Composition Writing', 'Letter Writing', 'Oral Literature'] },
-              { icon: '🔬', name: 'Integrated Science', color: '#7C3AED', bg: '#F5F3FF', border: '#C4B5FD', topics: ['Food Chains & Webs', 'Human Body Systems', 'Living Things', 'Environment & Ecology', 'States of Matter', 'Health & Nutrition', 'Plants & Reproduction', 'Soil & Agriculture', 'Water & Weather', 'Energy & Forces'] },
+              { icon: '🔢', name: 'Mathematics', color: '#D97706', bg: '#FFFBEB', border: '#FCD34D', topics: ['Fractions & Decimals', 'Ratio & Proportion', 'Percentages', 'LCM & HCF', 'Geometry & Angles', 'Money & Finance', 'Word Problems', 'Data Handling', 'Algebra', 'Sets', 'Number Bases', 'Integers'] },
+              { icon: '📖', name: 'English Language', color: '#059669', bg: '#ECFDF5', border: '#6EE7B7', topics: ['Grammar & Tenses', 'Parts of Speech', 'Vocabulary & Idioms', 'Reading Comprehension', 'Punctuation & Spelling'] },
+              { icon: '🔬', name: 'Integrated Science', color: '#7C3AED', bg: '#F5F3FF', border: '#C4B5FD', topics: ['Food Chains & Webs', 'Human Body Systems', 'Living Things', 'Environment & Ecology', 'States of Matter', 'Health & Nutrition', 'Plants', 'Animal Reproduction', 'Soil & Agriculture', 'Water & Weather', 'Energy', 'Forces & Motion', 'Science & Technology'] },
             ].map(s => (
               <div key={s.name} style={{ background: s.bg, borderRadius: 20, padding: 20, border: `1.5px solid ${s.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
