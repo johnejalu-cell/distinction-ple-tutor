@@ -106,8 +106,13 @@ async function compressImage(file: File, maxWidth = 800, quality = 0.6): Promise
 function SessionContent() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [current, setCurrent] = useState(0)
-  const [selected, setSelected] = useState<string | null>(null)
-  const [answered, setAnswered] = useState(false)
+  // Per-question submitted answers, keyed by question index. Replaces the
+  // old single `selected`/`answered` booleans so a student can navigate
+  // back to any already-answered question and see it in its answered
+  // (read-only) state, instead of that state being wiped by moving on.
+  const [responses, setResponses] = useState<Record<number, string>>({})
+  // The option tapped but not yet submitted for the CURRENT question only.
+  const [pendingSelected, setPendingSelected] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [studentId, setStudentId] = useState<string | null>(null)
   const [points, setPoints] = useState(0)
@@ -118,7 +123,7 @@ function SessionContent() {
   const [subjectName, setSubjectName] = useState('')
   const [isAdaptive, setIsAdaptive] = useState(false)
   const [hasFullAccess, setHasFullAccess] = useState(true)
-  const [questionLimit, setQuestionLimit] = useState(5)
+  const [questionLimit, setQuestionLimit] = useState(10)
 
   // Ref-based correct count for accurate scoring
   const correctRef = useRef(0)
@@ -157,7 +162,7 @@ function SessionContent() {
       .single()
 
     let fullAccess = true
-    let limit = 5
+    let limit = 10
 
     if (profile) {
       const now = new Date()
@@ -166,7 +171,7 @@ function SessionContent() {
       const subscriptionActive = profile.is_subscribed &&
         (!profile.subscription_expires_at || new Date(profile.subscription_expires_at) > now)
       fullAccess = trialActive || subscriptionActive
-      limit = fullAccess ? 5 : 3
+      limit = fullAccess ? 10 : 3
     }
 
     setHasFullAccess(fullAccess)
@@ -324,9 +329,9 @@ function SessionContent() {
       const mediumPool = questionPool.filter(q => mediumIds.includes(q.subtopic_id))
       const strongPool = questionPool.filter(q => strongIds.includes(q.subtopic_id))
 
-      const weakQs = pickFresh(weakPool, 3)
-      const mediumQs = pickFresh(mediumPool, 1)
-      const strongQs = pickFresh(strongPool, 1)
+      const weakQs = pickFresh(weakPool, Math.ceil(limit * 0.6))
+      const mediumQs = pickFresh(mediumPool, Math.ceil(limit * 0.2))
+      const strongQs = pickFresh(strongPool, Math.ceil(limit * 0.2))
       const combined = [...weakQs, ...mediumQs, ...strongQs]
       if (combined.length >= 3) selectedQuestions = shuffle(combined)
     }
@@ -337,7 +342,7 @@ function SessionContent() {
       if (!selectedQuestions.length) { router.push('/dashboard'); return }
     }
 
-    // Apply question limit (3 for free, 5 for full access)
+    // Apply question limit (3 for free, 10 for full access)
     selectedQuestions = selectedQuestions.slice(0, limit)
     setQuestions(selectedQuestions)
 
@@ -352,19 +357,41 @@ function SessionContent() {
   }
 
   async function submitAnswer() {
-    if (!selected || answered) return
-    setAnswered(true)
+    if (!pendingSelected || responses[current] !== undefined) return
     const q = questions[current]
-    const isCorrect = selected === q.correct_answer
+    const chosen = pendingSelected
+    const isCorrect = chosen === q.correct_answer
+    setResponses(r => ({ ...r, [current]: chosen }))
     if (isCorrect) { correctRef.current += 1; setPoints(p => p + 20) }
     if (sessionId && studentId) {
       await supabase.from('session_responses').insert({
         session_id: sessionId, student_id: studentId, question_id: q.id,
-        student_answer: selected, is_correct: isCorrect,
+        student_answer: chosen, is_correct: isCorrect,
         hint_level_used: hintLevel, scaffold_opened: q.scaffold !== null,
         question_order: current + 1,
       })
     }
+  }
+
+  // Moves to a given question index and resets the per-question UI
+  // helpers (hint, tutor panel, uploaded image). Submitted answers in
+  // `responses` are untouched, so navigating back and forth always
+  // shows a previously-answered question in its answered state.
+  function goTo(index: number) {
+    setCurrent(index)
+    setPendingSelected(null)
+    setShowHint(false)
+    setHintLevel(0)
+    setShowTutor(false)
+    setTutorResponse('')
+    setTutorQuestion('')
+    setTutorError('')
+    clearImage()
+  }
+
+  function previousQuestion() {
+    if (current === 0) return
+    goTo(current - 1)
   }
 
   async function nextQuestion() {
@@ -400,16 +427,7 @@ function SessionContent() {
       setDone(true)
       return
     }
-    setCurrent(c => c + 1)
-    setSelected(null)
-    setAnswered(false)
-    setShowHint(false)
-    setHintLevel(0)
-    setShowTutor(false)
-    setTutorResponse('')
-    setTutorQuestion('')
-    setTutorError('')
-    clearImage()
+    goTo(current + 1)
   }
 
   // Image handling
@@ -499,7 +517,7 @@ function SessionContent() {
               ⚠️ Limited to {questionLimit} questions per day
             </div>
             <div style={{ fontSize: 13, color: '#854F0B', marginBottom: 10 }}>
-              Upgrade to get 5 questions per session, AI Tutor, Mock Exams and full Progress tracking.
+              Upgrade to get 10 questions per session, AI Tutor, Mock Exams and full Progress tracking.
             </div>
             <button onClick={() => router.push('/subscribe')}
               style={{ background: '#BA7517', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -533,7 +551,7 @@ function SessionContent() {
         </div>
 
         <button className="btn-primary" onClick={() => {
-          setCurrent(0); setSelected(null); setAnswered(false)
+          setCurrent(0); setResponses({}); setPendingSelected(null)
           correctRef.current = 0; setPoints(0); setDone(false)
           setShowTutor(false); setTutorResponse(''); init()
         }}>
@@ -547,6 +565,8 @@ function SessionContent() {
   }
 
   const q = questions[current]
+  const answered = responses[current] !== undefined
+  const selected = answered ? responses[current] : pendingSelected
   const isCorrect = selected === q.correct_answer
 
   return (
@@ -565,12 +585,39 @@ function SessionContent() {
       </div>
 
       <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
-        {/* Progress dots */}
-        <div style={{ display: 'flex', gap: 5, marginBottom: 18 }}>
-          {questions.map((_, i) => (
-            <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < current ? '#1D9E75' : i === current ? '#534AB7' : '#F1EFE8' }} />
-          ))}
+        {/* Progress dots — click any already-answered dot (or the current
+            one) to jump straight to it and review it. */}
+        <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
+          {questions.map((_, i) => {
+            const isAnswered = responses[i] !== undefined
+            const clickable = isAnswered || i === current
+            return (
+              <div key={i}
+                onClick={() => clickable && goTo(i)}
+                style={{
+                  flex: 1, height: 5, borderRadius: 3,
+                  cursor: clickable ? 'pointer' : 'default',
+                  background: i === current ? '#534AB7' : isAnswered ? '#1D9E75' : '#F1EFE8',
+                }} />
+            )
+          })}
         </div>
+
+        {/* Previous question — lets a student step back and review any
+            question they've already answered, without changing it. */}
+        {current > 0 && (
+          <button onClick={previousQuestion}
+            style={{ background: 'none', border: 'none', color: '#534AB7', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', padding: '2px 0 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ← Previous question
+          </button>
+        )}
+
+        {/* Reviewing-past-question notice */}
+        {answered && current < questions.length - 1 && Object.keys(responses).length > current + 1 && (
+          <div style={{ background: '#F1EFE8', borderRadius: 10, padding: '8px 14px', marginBottom: 14, fontSize: 12, color: '#5F5E5A' }}>
+            📖 Reviewing a question you've already answered — your original answer is shown below.
+          </div>
+        )}
 
         {/* Adaptive notice */}
         {isAdaptive && current === 0 && (
@@ -632,7 +679,7 @@ function SessionContent() {
               else if (opt.id === selected) cls += ' wrong'
             } else if (opt.id === selected) cls += ' selected'
             return (
-              <button key={opt.id} className={cls} onClick={() => !answered && setSelected(opt.id)} disabled={answered}>
+              <button key={opt.id} className={cls} onClick={() => !answered && setPendingSelected(opt.id)} disabled={answered}>
                 {String.fromCharCode(65 + q.options.indexOf(opt))}. {opt.text}
               </button>
             )
