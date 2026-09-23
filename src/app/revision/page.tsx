@@ -21,8 +21,13 @@ interface Question {
 function RevisionContent() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [current, setCurrent] = useState(0)
-  const [selected, setSelected] = useState<string | null>(null)
-  const [answered, setAnswered] = useState(false)
+  // Per-question submitted answers, keyed by index into `questions` — lets
+  // a student step back to any question already answered in this session
+  // (including ones loaded in an earlier batch) and see it read-only,
+  // instead of that state being wiped by moving on.
+  const [responses, setResponses] = useState<Record<number, string>>({})
+  // The option tapped but not yet submitted for the CURRENT question only.
+  const [pendingSelected, setPendingSelected] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [studentId, setStudentId] = useState<string | null>(null)
   const [subtopicIds, setSubtopicIds] = useState<string[]>([])
@@ -188,12 +193,13 @@ function RevisionContent() {
   }
 
   async function submitAnswer() {
-    if (!selected || answered) return
-    setAnswered(true)
+    if (!pendingSelected || responses[current] !== undefined) return
     const q = questions[current]
-    const isCorrect = selected === q.correct_answer
+    const chosen = pendingSelected
+    const isCorrect = chosen === q.correct_answer
     totalAnsweredRef.current += 1
     if (isCorrect) correctCountRef.current += 1
+    setResponses(r => ({ ...r, [current]: chosen }))
 
     // Mark as recently answered so future sessions deprioritise it
     recentlyAnswered.current.add(q.id)
@@ -201,11 +207,27 @@ function RevisionContent() {
     if (sessionId && studentId) {
       await supabase.from('session_responses').insert({
         session_id: sessionId, student_id: studentId, question_id: q.id,
-        student_answer: selected, is_correct: isCorrect,
+        student_answer: chosen, is_correct: isCorrect,
         hint_level_used: hintLevel, scaffold_opened: q.scaffold !== null,
         question_order: totalAnsweredRef.current,
       })
     }
+  }
+
+  // Moves to a given question index and resets the per-question UI
+  // helpers. Submitted answers in `responses` are untouched, so
+  // navigating back and forth always shows a previously-answered
+  // question in its answered state.
+  function goTo(index: number) {
+    setCurrent(index)
+    setPendingSelected(null)
+    setShowHint(false)
+    setHintLevel(0)
+  }
+
+  function previousQuestion() {
+    if (current === 0) return
+    goTo(current - 1)
   }
 
   async function nextQuestion() {
@@ -216,11 +238,7 @@ function RevisionContent() {
       setLoadingMore(false)
     }
 
-    setCurrent(c => c + 1)
-    setSelected(null)
-    setAnswered(false)
-    setShowHint(false)
-    setHintLevel(0)
+    goTo(current + 1)
   }
 
   async function endSession() {
@@ -299,6 +317,8 @@ function RevisionContent() {
     )
   }
 
+  const answered = responses[current] !== undefined
+  const selected = answered ? responses[current] : pendingSelected
   const isCorrect = selected === q.correct_answer
 
   return (
@@ -308,7 +328,7 @@ function RevisionContent() {
         <button className="topbar-back" onClick={() => { if (confirm('End revision session?')) endSession() }}>✕</button>
         <div className="topbar-title">📖 {subjectName} Revision</div>
         <div style={{ background: '#EEEDFE', color: '#3C3489', fontSize: 13, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
-          Q{totalAnsweredRef.current + 1}
+          Q{current + 1}
         </div>
       </div>
 
@@ -319,6 +339,18 @@ function RevisionContent() {
         <span>📊 {totalAnsweredRef.current > 0 ? Math.round((correctCountRef.current / totalAnsweredRef.current) * 100) : 0}% accuracy</span>
       </div>
 
+      {/* Previous question — lets a student step back and review any
+          question they've already answered this session, without
+          changing it. */}
+      {current > 0 && (
+        <div style={{ padding: '8px 16px 0' }}>
+          <button onClick={previousQuestion}
+            style={{ background: 'none', border: 'none', color: '#534AB7', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', padding: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ← Previous question
+          </button>
+        </div>
+      )}
+
       {/* Recycling notice */}
       {allExhausted && (
         <div style={{ background: '#FAEEDA', padding: '8px 16px', fontSize: 12, color: '#854F0B', textAlign: 'center' }}>
@@ -327,6 +359,13 @@ function RevisionContent() {
       )}
 
       <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
+        {/* Reviewing-past-question notice */}
+        {answered && Object.keys(responses).length > current + 1 && (
+          <div style={{ background: '#F1EFE8', borderRadius: 10, padding: '8px 14px', marginBottom: 14, fontSize: 12, color: '#5F5E5A' }}>
+            📖 Reviewing a question you've already answered — your original answer is shown below.
+          </div>
+        )}
+
         {/* Subject tag */}
         <div style={{
           fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20,
@@ -372,7 +411,7 @@ function RevisionContent() {
               else if (opt.id === selected) cls += ' wrong'
             } else if (opt.id === selected) cls += ' selected'
             return (
-              <button key={opt.id} className={cls} onClick={() => !answered && setSelected(opt.id)} disabled={answered}>
+              <button key={opt.id} className={cls} onClick={() => !answered && setPendingSelected(opt.id)} disabled={answered}>
                 {String.fromCharCode(65 + q.options.indexOf(opt))}. {opt.text}
               </button>
             )
