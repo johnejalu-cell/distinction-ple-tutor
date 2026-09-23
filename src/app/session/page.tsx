@@ -332,7 +332,20 @@ function SessionContent() {
       const weakQs = pickFresh(weakPool, Math.ceil(limit * 0.6))
       const mediumQs = pickFresh(mediumPool, Math.ceil(limit * 0.2))
       const strongQs = pickFresh(strongPool, Math.ceil(limit * 0.2))
-      const combined = [...weakQs, ...mediumQs, ...strongQs]
+      let combined = [...weakQs, ...mediumQs, ...strongQs]
+
+      // The weak/medium/strong pools can each be smaller than their quota
+      // (e.g. a weak subtopic with only a few questions), which used to
+      // leave the session short of `limit` questions instead of topping
+      // up — this is why sessions sometimes showed "1/8" instead of the
+      // full count. Backfill any shortfall from the full weighted pool.
+      if (combined.length < limit) {
+        const usedIds = new Set(combined.map(cq => cq.id))
+        const remaining = questionPool.filter(pq => !usedIds.has(pq.id))
+        const topUp = pickWeighted(remaining, limit - combined.length)
+        combined = [...combined, ...topUp]
+      }
+
       if (combined.length >= 3) selectedQuestions = shuffle(combined)
     }
 
