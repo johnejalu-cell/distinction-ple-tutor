@@ -279,8 +279,8 @@ export default function DashboardPage() {
         <div style={{ fontSize: 13, color: '#1D9E75', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>
             {weakSubtopic
-              ? `Focus: ${weakSubtopic.subtopic} · ${access.hasFullAccess ? '5 questions' : '3 questions'}`
-              : access.hasFullAccess ? 'Start practising · 5 questions' : 'Limited · 3 questions only'
+              ? `Focus: ${weakSubtopic.subtopic} · ${access.hasFullAccess ? '10 questions' : '3 questions'}`
+              : access.hasFullAccess ? 'Start practising · 10 questions' : 'Limited · 3 questions only'
             }
           </span>
           <span style={{ fontSize: 18 }}>→</span>
@@ -411,4 +411,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-
